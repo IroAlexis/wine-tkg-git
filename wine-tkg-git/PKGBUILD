@@ -1,6 +1,6 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
-pkgname=wine-tkg-git
+pkgname=lunion-play
 pkgver=5.6.1.r9.g4e0031b0
 
 # workaround for pkgrel overwritten on regen
