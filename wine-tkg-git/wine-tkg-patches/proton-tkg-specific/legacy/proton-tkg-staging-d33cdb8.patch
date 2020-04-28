@@ -785,7 +785,7 @@ index 431c247a072..c9fcad79316 100644
 +    while (*str)
 +    {
 +        const WCHAR *p1 = str, *p2 = sub;
-+        while (*p1 && *p2 && RtlDowncaseUnicodeChar(*p1) == RtlDowncaseUnicodeChar(*p2)) { p1++; p2++; }
++        while (*p1 && *p2 && tolowerW(*p1) == tolowerW(*p2)) { p1++; p2++; }
 +        if (!*p2) return (WCHAR *)str;
 +        str++;
 +    }
@@ -1854,6 +1854,107 @@ index a5235b69a8d..4b2c9bd41ae 100644
          /* forward request to the foreground window if it's in a different thread */
          tid = GetWindowThreadProcessId( foreground, &pid );
          if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
+From 02951753970f5b2a0dafe41aee9fe96bc1a24301 Mon Sep 17 00:00:00 2001
+From: Piotr Caban <piotr@codeweavers.com>
+Date: Wed, 4 Mar 2020 18:49:37 +0100
+Subject: [PATCH] HACK: ntdll: Mark first gta5.exe page as copied.
+
+---
+ dlls/ntdll/virtual.c | 30 +++++++++++++++++++++++++++---
+ 1 file changed, 27 insertions(+), 3 deletions(-)
+
+diff --git a/dlls/ntdll/virtual.c b/dlls/ntdll/virtual.c
+index dbcbd52c6d6..90a790241a9 100644
+--- a/dlls/ntdll/virtual.c
++++ b/dlls/ntdll/virtual.c
+@@ -58,6 +58,7 @@
+ #include "wine/exception.h"
+ #include "wine/rbtree.h"
+ #include "wine/debug.h"
++#include "wine/unicode.h"
+ #include "ntdll_misc.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(virtual);
+@@ -84,6 +85,7 @@ struct file_view
+ #define VPROT_GUARD      0x10
+ #define VPROT_COMMITTED  0x20
+ #define VPROT_WRITEWATCH 0x40
++#define VPROT_COPIED     0x80
+ /* per-mapping protection flags */
+ #define VPROT_SYSTEM     0x0200  /* system view (underlying mmap not under our control) */
+ 
+@@ -304,7 +306,8 @@ static const char *VIRTUAL_GetProtStr( BYTE prot )
+     buffer[0] = (prot & VPROT_COMMITTED) ? 'c' : '-';
+     buffer[1] = (prot & VPROT_GUARD) ? 'g' : ((prot & VPROT_WRITEWATCH) ? 'H' : '-');
+     buffer[2] = (prot & VPROT_READ) ? 'r' : '-';
+-    buffer[3] = (prot & VPROT_WRITECOPY) ? 'W' : ((prot & VPROT_WRITE) ? 'w' : '-');
++    buffer[3] = (prot & VPROT_WRITECOPY) ? (prot & VPROT_COPIED ? 'w' : 'W')
++        : ((prot & VPROT_WRITE) ? 'w' : '-');
+     buffer[4] = (prot & VPROT_EXEC) ? 'x' : '-';
+     buffer[5] = 0;
+     return buffer;
+@@ -901,8 +904,11 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
+  */
+ static DWORD VIRTUAL_GetWin32Prot( BYTE vprot, unsigned int map_prot )
+ {
+-    DWORD ret = VIRTUAL_Win32Flags[vprot & 0x0f];
+-    if (vprot & VPROT_GUARD) ret |= PAGE_GUARD;
++    DWORD ret;
++
++    if ((vprot & (VPROT_COPIED | VPROT_WRITECOPY)) == (VPROT_COPIED | VPROT_WRITECOPY))
++        vprot = (vprot & ~VPROT_WRITECOPY) | VPROT_WRITE;
++    ret = VIRTUAL_Win32Flags[vprot & 0x0f];
+     if (map_prot & SEC_NOCACHE) ret |= PAGE_NOCACHE;
+     return ret;
+ }
+@@ -2957,6 +2963,24 @@ NTSTATUS WINAPI DECLSPEC_HOTPATCH NtProtectVirtualMemory( HANDLE process, PVOID
+         {
+             old = VIRTUAL_GetWin32Prot( vprot, view->protect );
+             status = set_protection( view, base, size, new_prot );
++
++            /* GTA5 HACK: Mark first page as copied. */
++            if (status == STATUS_SUCCESS && (view->protect & SEC_IMAGE) &&
++                    base == (void*)NtCurrentTeb()->Peb->ImageBaseAddress)
++            {
++                const WCHAR gta5W[] = { 'g','t','a','5','.','e','x','e',0 };
++                WCHAR *name, *p;
++
++                name = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
++                p = strrchrW(name, '\\');
++                p = p ? p+1 : name;
++
++                if(!strcmpiW(p, gta5W))
++                {
++                    FIXME("HACK: changing GTA5.exe vprot\n");
++                    set_page_vprot_bits(base, page_size, VPROT_COPIED, 0);
++                }
++            }
+         }
+         else status = STATUS_NOT_COMMITTED;
+     }
+From 5e8fedb161bae24ecf6d9425e90e3c595ec2505c Mon Sep 17 00:00:00 2001
+From: Piotr Caban <piotr@codeweavers.com>
+Date: Wed, 11 Mar 2020 09:17:05 -0500
+Subject: [PATCH] ntdll: Restore PAGE_GUARD flag
+
+On rebase, squash into 'HACK: ntdll: Mark first gta5.exe page as
+copied.'
+---
+ dlls/ntdll/virtual.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/dlls/ntdll/virtual.c b/dlls/ntdll/virtual.c
+index 90a790241a9..d0cd2639ee9 100644
+--- a/dlls/ntdll/virtual.c
++++ b/dlls/ntdll/virtual.c
+@@ -909,6 +909,7 @@ static DWORD VIRTUAL_GetWin32Prot( BYTE vprot, unsigned int map_prot )
+     if ((vprot & (VPROT_COPIED | VPROT_WRITECOPY)) == (VPROT_COPIED | VPROT_WRITECOPY))
+         vprot = (vprot & ~VPROT_WRITECOPY) | VPROT_WRITE;
+     ret = VIRTUAL_Win32Flags[vprot & 0x0f];
++    if (vprot & VPROT_GUARD) ret |= PAGE_GUARD;
+     if (map_prot & SEC_NOCACHE) ret |= PAGE_NOCACHE;
+     return ret;
+ }
 From 24a8f709ec8fcf8fa4fcc349a7885c02cc184d74 Mon Sep 17 00:00:00 2001
 From: Derek Lesho <dlesho@codeweavers.com>
 Date: Wed, 26 Feb 2020 13:09:48 -0600
@@ -2010,47 +2111,3 @@ index 4ca04198b6e..483e2b4138a 100644
      FAudioCOMConstructWithCustomAllocatorEXT(
          &object->faudio,
          XAUDIO2_VER,
-From b739d48093cce805b7b4f48fdbd9d0bb62bc8013 Mon Sep 17 00:00:00 2001
-From: Brendan Shanks <bshanks@codeweavers.com>
-Date: Mon, 13 Apr 2020 16:25:47 -0700
-Subject: [PATCH] HACK: dxgi: Swap around memory sizes for GTA IV
-
-GTA IV ends up using its "Intel integrated" codepath for determining
-VRAM size (since nvapi/atiadlxx fail), but this requires that
-DedicatedVideoMemory is a very small dummy value, and SharedSystemMemory
-is the actual VRAM size.
-Swap the memory values around so this works.
----
- dlls/dxgi/adapter.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/dlls/dxgi/adapter.c b/dlls/dxgi/adapter.c
-index 5a97590dbce..a5563498cdd 100644
---- a/dlls/dxgi/adapter.c
-+++ b/dlls/dxgi/adapter.c
-@@ -200,6 +200,25 @@ static HRESULT dxgi_adapter_get_desc(struct dxgi_adapter *adapter, DXGI_ADAPTER_
-     desc->GraphicsPreemptionGranularity = 0; /* FIXME */
-     desc->ComputePreemptionGranularity = 0; /* FIXME */
- 
-+    {
-+        /* HACK
-+         *
-+         * Grand Theft Auto IV first tries to get VRAM size using nvapi/atiadlxx,
-+         * after that fails it falls back to the Intel integrated codepath which
-+         * uses DXGI.
-+         *
-+         * DedicatedVideoMemory must be a dummy value less than 200 MB, then
-+         * SharedSystemMemory will be used as the VRAM size.
-+         * In case of failure, the game will just use 512 MB as VRAM size.
-+         */
-+        const char *sgi = getenv("SteamGameId");
-+        if(sgi && !strcmp(sgi, "12210"))
-+        {
-+            desc->SharedSystemMemory = adapter_id.video_memory;
-+            desc->DedicatedVideoMemory = 32 * 1024 * 1024;
-+        }
-+    }
-+
-     return hr;
- }
- 
