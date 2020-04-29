@@ -488,6 +488,12 @@ _prepare() {
 	  fi
 	}
 
+	if [ "$_mtga_fix" == "true" ] && git merge-base --is-ancestor e5a9c256ce08868f65ed730c00cf016a97369ce3 HEAD; then
+	  _committorevert=341068aa61a71afecb712feda9aabb3dc1c3ab5f && nonuser_reverter
+	  _committorevert=e5a9c256ce08868f65ed730c00cf016a97369ce3 && nonuser_reverter
+	  echo -e "( MTGA bandaid reverts applied )\n" >> "$_where"/last_build_config.log
+	fi
+
 	if [ "$_gamepad_additions" == "true" ] && [ "$_use_staging" == "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" == "proton" ] && git merge-base --is-ancestor da7d60bf97fb8726828e57f852e8963aacde21e9 HEAD; then
 	  _committorevert=da7d60bf97fb8726828e57f852e8963aacde21e9 && nonuser_reverter
 	  echo -e "( Proton gamepad additions unbreak revert applied )\n" >> "$_where"/last_build_config.log
@@ -989,8 +995,10 @@ _prepare() {
 
 	# Fix for LoL 9.20+ crashing - https://bugs.winehq.org/show_bug.cgi?id=47198
 	if [ "$_lol920_fix" == "true" ] && [ "$_use_staging" == "true" ]; then
-	  if git merge-base --is-ancestor 98682cfd01aca9be2755e4279db87d54e3642f0b HEAD; then
+	  if git merge-base --is-ancestor bd9a1e23f2a1eb97492ff977dcb0d96fde8ab2ad HEAD; then
 	    _patchname='leagueoflolfix.patch' && _patchmsg="Applied LoL 9.20+ fix - Requires vdso32 disabled (echo 0 > /proc/sys/abi/vsyscall32)" && nonuser_patcher
+	  elif git merge-base --is-ancestor 98682cfd01aca9be2755e4279db87d54e3642f0b HEAD; then
+	    _patchname='leagueoflolfix-bd9a1e2.patch' && _patchmsg="Applied LoL 9.20+ fix - Requires vdso32 disabled (echo 0 > /proc/sys/abi/vsyscall32)" && nonuser_patcher
 	  elif git merge-base --is-ancestor 18273d5e71e25575bdbdba1d252df72be3373f6d HEAD; then
 	    _patchname='leagueoflolfix-98682cf.patch' && _patchmsg="Applied LoL 9.20+ fix - Requires vdso32 disabled (echo 0 > /proc/sys/abi/vsyscall32)" && nonuser_patcher
 	  elif git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD; then
