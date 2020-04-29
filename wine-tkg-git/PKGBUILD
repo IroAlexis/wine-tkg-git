@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play
-pkgver=5.7.r3.g8a46f19e
+pkgver=5.7.r5.g1785a569
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
@@ -645,7 +645,7 @@ md5sums=('SKIP'
          'a560dac3c8405e28758c525adf99f14d'
          'b32acd9b9185a5b5fbdd59bbeaee43a0'
          'f404adafc8648495270e01241cd0601e'
-         '2cde672cf5fae90d325757e0b7dcd745'
+         'bf7065d93b02f4a993abfb2ae9d079ab'
          '8681c98f6d488957a206c9c1f2f9547f'
          '3d5518c89320a59400774a86b9a1cf2f'
          '0310c86f736d1c9f35cdabdaedea9396'
