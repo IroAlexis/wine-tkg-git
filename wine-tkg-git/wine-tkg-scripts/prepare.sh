@@ -361,14 +361,14 @@ _prepare() {
 	# holds extra configure arguments, if applicable
 	_configure_args=()
 
+	source "$_where"/wine-tkg-patches/hotfixes/hotfixer
+
 	if [ "$_use_staging" == "true" ] && [ "$_staging_upstreamignore" != "true" ]; then
 	  cd "${srcdir}"/"${_winesrcdir}"
 	  # change back to the wine upstream commit that this version of wine-staging is based in
 	  msg2 'Changing wine HEAD to the wine-staging base commit...'
 	  git checkout "$(../"$_stgsrcdir"/patches/patchinstall.sh --upstream-commit)"
 	fi
-
-	source "$_where"/wine-tkg-patches/hotfixes/hotfixer
 
 	# Community patches
 	if [ -n "$_community_patches" ]; then
@@ -1264,7 +1264,7 @@ EOM
 	  else
 	    _patchname='proton-rawinput-74dc0c5.patch' && _patchmsg="Using rawinput patchset (<74dc0c5)" && nonuser_patcher
 	  fi
-	  if $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && cd "${srcdir}"/"${_winesrcdir}"); then # Apply staging winex11-key_translation patchset post staging-application when enabled
+	  if [[ ! ${_staging_userargs[*]} =~ "winex11-key_translation" ]] && $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && cd "${srcdir}"/"${_winesrcdir}"); then # Apply staging winex11-key_translation patchset post staging-application when enabled
 	      cp -u "${srcdir}"/"${_stgsrcdir}"/patches/winex11-key_translation/*.patch "$_where"/ && ln -s -f "${srcdir}"/"${_stgsrcdir}"/patches/winex11-key_translation/*.patch "${srcdir}"/
 	      _patchname='0001-winex11-Match-keyboard-in-Unicode.patch' && _patchmsg="Applied proton friendly winex11-Match-keyboard-in-Unicode" && nonuser_patcher
 	      _patchname='0002-winex11-Fix-more-key-translation.patch' && _patchmsg="Applied proton friendly winex11-Fix-more-key-translation" && nonuser_patcher
@@ -1395,7 +1395,7 @@ EOM
 
 	echo -e "" >> "$_where"/last_build_config.log
 
-	if [ "$_EXTERNAL_INSTALL" == "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" == "proton" ] && [ "$_unfrog" != "true" ] || ([ "$_protonify" == "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
+	if [ "$_EXTERNAL_INSTALL" == "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" == "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" == "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
 	  if git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
 	    if [ "$_use_staging" == "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
@@ -1713,6 +1713,7 @@ EOM
 	if [ "$_user_patches" == "true" ]; then
 	  _userpatch_target="plain-wine"
 	  _userpatch_ext="my"
+	  cd "${srcdir}"/"${_winesrcdir}"
 	  hotfixer
 	  user_patcher
 	fi
