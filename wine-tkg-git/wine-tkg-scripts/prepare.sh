@@ -41,6 +41,7 @@ _exit_cleanup() {
     echo "_proton_mf_hacks=${_proton_mf_hacks}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_dxvk_dxgi=${_dxvk_dxgi}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_use_dxvk=${_use_dxvk}" >> "$_proton_tkg_path"/proton_tkg_token
+    echo "_dxvk_version=${_dxvk_version}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_pkgdest='${pkgdir}'" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_steamvr_support='${_steamvr_support}'" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_NUKR='${_NUKR}'" >> "$_proton_tkg_path"/proton_tkg_token
@@ -294,7 +295,8 @@ user_patcher() {
 	        msg2 "Reverting your own ${_userpatch_target} patch ${_f}"
 	        msg2 ""
 	        msg2 "######################################################"
-	        patch -Np1 -R < "${_f}"
+	        echo -e "\nReverting your own patch ${_f##*/}" >> "$_where"/prepare.log
+	        patch -Np1 -R < "${_f}" >> "$_where"/prepare.log || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
 	        echo -e "Reverted your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
 	    done
@@ -316,7 +318,8 @@ user_patcher() {
 	        msg2 "Applying your own ${_userpatch_target} patch ${_f}"
 	        msg2 ""
 	        msg2 "######################################################"
-	        patch -Np1 < "${_f}"
+	        echo -e "\nApplying your own patch ${_f##*/}" >> "$_where"/prepare.log
+	        patch -Np1 < "${_f}" >> "$_where"/prepare.log || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
 	        echo -e "Applied your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
 	    done
@@ -489,8 +492,9 @@ _prepare() {
 	# Reverts for commits known to break specific versions of the FS hack
 	nonuser_reverter() {
 	  if git merge-base --is-ancestor $_committorevert HEAD; then
-	    git revert -n --no-edit $_committorevert || exit 1
-	    echo "$_committorevert reverted $_hotfixmsg" >> "$_where"/last_build_config.log
+	    echo -e "\n$_committorevert reverted $_hotfixmsg" >> "$_where"/prepare.log
+	    git revert -n --no-edit $_committorevert >> "$_where"/prepare.log || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
+	    echo -e "$_committorevert reverted $_hotfixmsg" >> "$_where"/last_build_config.log
 	  fi
 	}
 
@@ -801,8 +805,8 @@ _prepare() {
 	fi
 
 	if [ "$_use_staging" == "true" ] && [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW2" == "y" ]; then
-	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args[@]}\n" >> "$_where"/last_build_config.log
-	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}"
+	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args[@]}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
+	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}" >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
 
 	  # Remove staging version tag
 	  sed -i "s/  (Staging)//g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
@@ -971,9 +975,11 @@ _prepare() {
 	  fi
 
 	  # apply esync patches
+	  echo -e "\nEsync-mainline" >> "$_where"/prepare.log
 	  for _f in "${srcdir}"/"${_esyncsrcdir}"/*.patch; do
 	    msg2 "Applying ${_f}"
-	    git apply -C1 --verbose < "${_f}"
+	    echo -e "\nApplying ${_f}" >> "$_where"/prepare.log
+	    git apply -C1 --verbose < "${_f}" >> "$_where"/prepare.log 2>&1
 	  done
 
 	  if git merge-base --is-ancestor b2a546c92dabee8ab1c3d5b9fecc84d99caf0e76 HEAD; then #  server: Introduce kernel_object struct for generic association between server and kernel objects.
@@ -1184,8 +1190,9 @@ EOM
 
 	# Legacy Proton Fullscreen inline patching
 	if [ "$_proton_rawinput" == "true" ] && [ "$_proton_fs_hack" == "true" ] && [ "$_use_staging" == "true" ] && $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 938dddf7df920396ac3b30a44768c1582d0c144f HEAD && cd "${srcdir}"/"${_winesrcdir}"); then
+	  echo -e "\nLegacy Proton Fullscreen inline patching" >> "$_where"/prepare.log
 	  for _f in "$_where"/valve_proton_fullscreen_hack-staging-{938dddf,de64501,82c6ec3,7cc69d7,0cb79db,a4b9460,57bb5cc,6e87235}.patch; do
-	    patch ${_f} << 'EOM'
+	    patch ${_f} >> "$_where"/prepare.log << 'EOM'
 @@ -2577,7 +2577,7 @@ index 1209a250b0..077c18ac10 100644
  +    input.u.mi.dx = pt.x;
  +    input.u.mi.dy = pt.y;
@@ -1425,7 +1432,9 @@ EOM
 	        else
 	          _patchname='proton-steam-bits-f8fb43a.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        fi
-	        _patchname='proton-seccomp-envvar.patch' && _patchmsg="Add WINESECCOMP env var support" && nonuser_patcher
+	        if [[ ! ${_staging_userargs[*]} =~ "ntdll-Syscall_Emulation" ]]; then
+	          _patchname='proton-seccomp-envvar.patch' && _patchmsg="Add WINESECCOMP env var support" && nonuser_patcher
+	        fi
 	      fi
 	    else
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
@@ -1551,7 +1560,9 @@ EOM
 	        else
 	          _patchname='proton-steam-bits-f8fb43a.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        fi
-	        _patchname='proton-seccomp-envvar.patch' && _patchmsg="Add WINESECCOMP env var support" && nonuser_patcher
+	        if [[ ! ${_staging_userargs[*]} =~ "ntdll-Syscall_Emulation" ]]; then
+	          _patchname='proton-seccomp-envvar.patch' && _patchmsg="Add WINESECCOMP env var support" && nonuser_patcher
+	        fi
 	      fi
 	    else
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD && [ "$_rpc" == "1" ]; then
@@ -1737,7 +1748,12 @@ EOM
 	  _patchname='wine-tkg.patch' && _patchmsg="Please don't report bugs about this wine build on winehq.org and use https://github.com/Tk-Glitch/PKGBUILDS/issues instead." && nonuser_patcher
 	fi
 
-	dlls/winevulkan/make_vulkan
+	# Get rid of temp patches
+	rm -rf "$_where"/*.patch
+	rm -rf "$_where"/*.my*
+	rm -rf "$_where"/*.orig
+
+	echo -e "\nRunning make_vulkan" >> "$_where"/prepare.log && dlls/winevulkan/make_vulkan >> "$_where"/prepare.log 2>&1
 	tools/make_requests
 	autoreconf -f
 
