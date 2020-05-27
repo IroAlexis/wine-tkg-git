@@ -5,10 +5,10 @@ if [[ ${_community_patches[*]} =~ "gofman_dac.mypatch" ]]; then
   if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 2c7588eb2f99f2941690b20148ef743477b1f58b HEAD && ! git merge-base --is-ancestor 8be56c21f9f3ddb774dca805a365e33322021f8b HEAD); then
     _staging_args+=(-W ntoskrnl.exe-KdRefreshDebuggerNotPresent)
   fi
-  if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 2263ec0d3db07c064541ab0b66108a3f81ae9b1a HEAD); then
+  if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 2263ec0d3db07c064541ab0b66108a3f81ae9b1a HEAD && ! git merge-base --is-ancestor f3298432f0c4614a7554e06c6c9a66ef3623ead8 HEAD); then
     _staging_args+=(-W ntoskrnl.exe-KeSetSystemAffinityThreadEx)
   fi
-  if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor bca232f19057160cd7af92882717e0a6c4553257 HEAD); then
+  if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor bca232f19057160cd7af92882717e0a6c4553257 HEAD && ! git merge-base --is-ancestor f3298432f0c4614a7554e06c6c9a66ef3623ead8 HEAD); then
     _staging_args+=(-W ntoskrnl.exe-KeRevertToUserAffinityThreadEx)
   fi
   if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 9ffacb6b0982ef388cfa327b358fe54660c6834a HEAD && ! git merge-base --is-ancestor 8be56c21f9f3ddb774dca805a365e33322021f8b HEAD); then
@@ -43,6 +43,12 @@ fi
 
 # Broken staging fbe1ba5
 if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor fbe1ba5578fb7380e2b09a5aebf5aa488744a823 HEAD && ! git merge-base --is-ancestor 5246a035e9d8f978a7b49bb9a607dc1edbc0c53d HEAD); then
+  msg2 "Ignoring staging upstream commit on this SHA (hotfix)"
+  _staging_upstreamignore="true"
+fi
+
+# Broken staging f329843
+if (cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor f3298432f0c4614a7554e06c6c9a66ef3623ead8 HEAD); then
   msg2 "Ignoring staging upstream commit on this SHA (hotfix)"
   _staging_upstreamignore="true"
 fi
