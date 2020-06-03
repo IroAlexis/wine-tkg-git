@@ -1,11 +1,11 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play
-pkgver=5.9.r12.g06877e55
+pkgver=5.9.r21.g0db92c33
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
-eval pkgrel=274
+eval pkgrel=276
 
 _stgsrcdir='wine-staging-git'
 _esyncsrcdir='esync'
@@ -28,13 +28,13 @@ _pkgnaming
 
 # custom plain wine commit to pass to git
 if [ -n "$_plain_version" ]; then
-  if [ "$_use_staging" == "false" ] || ( [ "$_use_staging" == "true" ] && [ "$_staging_upstreamignore" == true ] ); then
+  if [ "$_use_staging" = "false" ] || ( [ "$_use_staging" = "true" ] && [ "$_staging_upstreamignore" = "true" ] ); then
     _plain_commit="#commit=$_plain_version"
   fi
 fi
 
 # custom staging commit to pass to git
-if [ "$_use_staging" == "true" ] && [ -n "$_staging_version" ]; then
+if [ "$_use_staging" = "true" ] && [ -n "$_staging_version" ]; then
   _staging_commit="#commit=$_staging_version"
 fi
 
@@ -110,8 +110,10 @@ makedepends=('git' 'autoconf' 'ncurses' 'bison' 'perl' 'fontforge' 'flex'
 )
 
 # vkd3d deps
-if [ "$_use_vkd3d" == "true" ]; then
+if [ "$_use_vkd3d" = "mainline" ]; then
   makedepends+=('vkd3d' 'lib32-vkd3d')
+elif [ "$_use_vkd3d" = "fork" ]; then
+  makedepends+=('vkd3d-fork' 'lib32-vkd3d-fork')
 fi
 
 # proton-tkg deps
@@ -121,7 +123,7 @@ if [ -e "$_where"/proton_tkg_token ]; then
 fi
 
 # wine-mono deps
-if [ "$_use_mono" == "true" ]; then
+if [ "$_use_mono" = "true" ]; then
   depends+=('wine-mono')
 fi
 
@@ -158,7 +160,7 @@ if [ -n "$_custom_wine_source" ]; then
   _winesrcdir=$( sed 's|/|-|g' <<< $(sed 's|.*://.[^/]*/||g' <<< $_custom_wine_source))
   _winesrctarget="$_custom_wine_source"
 else
-  if [ "$_plain_mirrorsrc" == "true" ]; then
+  if [ "$_plain_mirrorsrc" = "true" ]; then
     _winesrcdir="wine-mirror-git"
     _winesrctarget="git+https://github.com/wine-mirror/wine.git"
   else
@@ -262,6 +264,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'PBA317+.patch' # For 3.17-3.18
 		# misc
 		'wine-tkg.patch' # Do NOT report bugs at winehq when using custom build
+		'wine-tkg-c7760ce.patch' # Do NOT report bugs at winehq when using custom build
 		'wine-tkg-staging.patch' # Do NOT report bugs at winehq when using custom build - staging
 		'steam.patch' # auto-append --no-sandbox
 		'steam-712ae33.patch' # auto-append --no-sandbox (<712ae33)
@@ -536,6 +539,7 @@ md5sums=('SKIP'
          '0a8e5406472ae39c0687bc017edfb352'
          'c77e94d56f57d27dd26e9f99cbcd5bc3'
          'd27ec22ee6815a97b4d28ccdfc0420fe'
+         '505487c5bcbe5bc81b0f8a4cb27ae631'
          '620823d02d9278f44924780d28cf7221'
          '898fe6be699c16ef95ffb24aa752c98b'
          'ca9c5c635f2c7b2236fbc159c69490f3'
@@ -581,13 +585,13 @@ md5sums=('SKIP'
          '2156fa1d317ac7179d36ac179bbb9049'
          '5ca4ee142eafe2c8873d59b2feb51a7d'
          '684d1c60aa38a659b1dd792b1d7cd8f5'
-         '8a06de299d35ea112ad48362a17ccd82'
+         '55b07d802333f4383d6b6257c8062381'
          '72d8a6cc848ea337ce8b627eae43d6f8'
          '0cd41f7ada677a1441d093076c98a894'
          '7793838191ccf67fee6802d5fc8c0be1'
          'e1139317e531f6cfe3633d441bd3eb18'
          '088561d2f36294b7734c315d03f842b3'
-         'd589c1a042c520f36a6de8eee6d2cb8f'
+         '180f76784d23dbc5d10d32a3fd1e44d2'
          '3f02072ea221cb38214762c60a9c3f35'
          '5ccbe6c21419ba1a69ad9a3543b9c6cd'
          '6679453cf783b698d398148dbec6120d'
@@ -637,7 +641,7 @@ md5sums=('SKIP'
          'be904d3277203654bf571bfb4da95d28'
          '013f23067eb566c47ba4cd4f03a05208'
          '00c29000e451ea5fa22a2f25d453a77f'
-         '00c29000e451ea5fa22a2f25d453a77f'
+         '2bdf0f3e57353338145c65ddfe19cebb'
          '7d9a7cf523c7283c64266148707b8bac'
          'fbc02256e0e85668be75e0275637d6c1'
          '4aa05580e78d36fdbd80f2ef2f46a6b3'
@@ -665,7 +669,7 @@ md5sums=('SKIP'
          'e9119e3f4032dfb217149492e8dd3587'
          'a560dac3c8405e28758c525adf99f14d'
          'b32acd9b9185a5b5fbdd59bbeaee43a0'
-         '70a45b8c6eaacf42272646dbdc60b5a4'
+         '74f6ca63b92426f3acc9ac4e779de81d'
          'f404adafc8648495270e01241cd0601e'
          'bf7065d93b02f4a993abfb2ae9d079ab'
          '8681c98f6d488957a206c9c1f2f9547f'
@@ -675,7 +679,7 @@ md5sums=('SKIP'
          '22d3b0b1ff7f2104312b5eb29959cb2e'
          'a60ed4b348b49d9b1b31e14f568cbad9'
          '52f11ca72f4ee06bd2a4bc2b0314e631'
-         '6d3b224e1e6dc858af0480fecaaa8876'
+         'aa3d7083feafc62f0c6427e0b98c42e2'
          '2cf363e936aa87450c79bd131eea1f9f'
          'ef9d49400425109ed6e7c39060a0e27e'
          'fee4328b205727568bbe73e0170eb259'
@@ -702,7 +706,7 @@ md5sums=('SKIP'
          '64dde324c635e4b4cdc271fe11de627b'
          '5fa8262cf09764300313cb119cb5afef'
          '045aad3b7247f4ce632f6512ebfeb527'
-         'dc49c775c97655bde1693a70b8b4418e'
+         '5d69ad7bba04007ffee2aa5f988b4bac'
          '4cb7a74ca0d275fcaaae8f58d0a55d5e'
          '8cd107d25ae8a6e8ee0b2681d49e3749'
          'fa264c4186aba31143a07104d3d4cd06'
@@ -714,17 +718,17 @@ md5sums=('SKIP'
          '87c0cd45f2291fd0b84312f3026d7f28'
          'd0df11c800e327314de345e815b41a6d'
          '863a40ba1ce2c66d3a7230df0ff71a09'
-         'cdb4f44dde648dd194873ddfe62867a9'
+         '668b0ddb6fa5b9ea2e709a7cd8c178dd'
          'dfda79f2fc402d976c35c979aa3da221'
          'b3b4a54457186f85b9471dbb44f0628d'
          '1a974db3a62100e6af91b0fb95412554'
          'd53ca026a6832f45daeb451af6a95252'
          'a7e78904f0919da69a8ad7081e7d9df0'
-         '0b58e3c24a323b5c5c2b9f442f440d01'
-         '7b06356121d664ea054badd97ce482f9'
+         '746169aa35911b8dd58d0554f8236806'
+         '853baac75d041f8b1c4f3543b5ee47dd'
          '878a27a4b7928e016a74f525fc3b2271')
 
-if [ "$_EXTERNAL_INSTALL" == "true" ]; then
+if [ "$_EXTERNAL_INSTALL" = "true" ]; then
   provides=(
     "$pkgname=$pkgver"
   )
@@ -744,7 +748,7 @@ makedepends=("${makedepends[@]}" "${depends[@]}")
 install=wine.install
 
 nonuser_patcher() {
-  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW1" == "y" ]; then
+  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW1" = "y" ]; then
     if [ "$_nopatchmsg" != "true" ]; then
       _fullpatchmsg=" -- ( $_patchmsg )"
     fi
@@ -756,7 +760,7 @@ nonuser_patcher() {
 }
 
 pkgver() {
-	if [ "$_use_staging" == "true" ]; then
+	if [ "$_use_staging" = "true" ]; then
 	  cd "${srcdir}/${_stgsrcdir}"
 	else
 	  cd "${srcdir}/${_winesrcdir}"
@@ -780,7 +784,7 @@ prepare() {
 	    msg2 'I am offering a couple ways to get a MinGW toolchain for Wine/DXVK with mostlyportable-gcc and mingw-on-arch-automator if needed.'
 	    read -rp "Press enter to continue without mingw-w64-gcc, or hit ctrl+c to exit..."
 	  fi
-	elif [ "$_NOMINGW" == "true" ]; then
+	elif [ "$_NOMINGW" = "true" ]; then
 	  _configure_args+=(--without-mingw)
 	fi
 
@@ -806,12 +810,12 @@ build() {
   fi
 
   # External install
-  if [ "$_EXTERNAL_INSTALL" == "true" ]; then
+  if [ "$_EXTERNAL_INSTALL" = "true" ]; then
     if [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
-      if [ "$_EXTERNAL_NOVER" == "true" ]; then
+      if [ "$_EXTERNAL_NOVER" = "true" ]; then
         _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname"
       else
-        if [ "$_use_staging" == "true" ]; then
+        if [ "$_use_staging" = "true" ]; then
           cd "$srcdir/$_stgsrcdir"
         else
           cd "$srcdir/$_winesrcdir"
@@ -819,7 +823,7 @@ build() {
         _realwineversion=$(_describe_wine)
         _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname-$_realwineversion"
       fi
-    elif [ "$_EXTERNAL_INSTALL_TYPE" == "proton" ]; then
+    elif [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]; then
       _prefix="$_where"
       _configure_args+=(--without-curses)
     fi

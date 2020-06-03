@@ -41,7 +41,10 @@ user_settings = {
 #    "PROTON_WINETRICKS": "1",
 
     #Enable seccomp-bpf filter to emulate native syscalls, required for some DRM protections to work. Requires staging on proton-tkg.
-    "PROTON_USE_SECCOMP": "1",
+#    "PROTON_USE_SECCOMP": "1",
+
+    #Disable support for memory write watches in ntdll. This improves performance for games that heavily use write watches, but can still work without them (e.g. CoreRT-based games).
+#    "PROTON_NO_WRITE_WATCH": "1",
 
     #Use OpenGL-based wined3d for d3d11/d3d10/d3d9 instead of Vulkan-based DXVK & D9VK
 #    "PROTON_USE_WINED3D": "1",
