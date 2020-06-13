@@ -35,6 +35,7 @@ _exit_cleanup() {
     echo "_proton_winedbg_disable=${_proton_winedbg_disable}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_pulse_lowlat=${_proton_pulse_lowlat}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_force_LAA=${_proton_force_LAA}" >> "$_proton_tkg_path"/proton_tkg_token
+    echo "_proton_shadercache_path=${_proton_shadercache_path}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_winetricks=${_proton_winetricks}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_dxvk_async=${_proton_dxvk_async}" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_proton_use_steamhelper=${_proton_use_steamhelper}" >> "$_proton_tkg_path"/proton_tkg_token
@@ -532,6 +533,7 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then
+	    _committorevert=e3eb89d5ebb759e975698b97ed8b547a9de3853f && nonuser_reverter
 	    _committorevert=707fcb99a60015fcbb20c83e9031bc5be7a58618 && nonuser_reverter
 	    _committorevert=8cd6245b7633abccd68f73928544ae4de6f76d52 && nonuser_reverter
 	    _committorevert=26b26a2e0efcb776e7b0115f15580d2507b10400 && nonuser_reverter
@@ -539,6 +541,12 @@ _prepare() {
 	    _committorevert=2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  fi
+	fi
+
+	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 26c1131201f8fd9918a01231a7eb6f1989400858 HEAD ); then
+	  _committorevert=306c40e67319cae8e4c448ec8fc8d3996f87943f && nonuser_reverter
+	  _committorevert=26c1131201f8fd9918a01231a7eb6f1989400858 && nonuser_reverter
+	  echo -e "( Proton rawinput unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
 	# Kernelbase reverts patchset - cleanly reverting part
@@ -689,8 +697,17 @@ _prepare() {
 	cd "${srcdir}"/"${_stgsrcdir}"
 	if [ "$_use_staging" = "true" ] && git merge-base --is-ancestor e09468ec178930ac7b1ee33482cd03f0cc136685 HEAD && ! git merge-base --is-ancestor 5b066d6aed7fd90c0be0a2a156b0e5c6cbb44bba HEAD; then
 	  _staging_args+=(-W user32-rawinput)
-    fi
+	fi
 	cd "${srcdir}"/"${_winesrcdir}"
+
+	# Disable Staging's `xactengine-initial` patchset to fix BGM on KOF98 & 2002
+	if [ "$_kof98_2002_BGM_fix" = "true" ] && [ "$_use_staging" = "true" ]; then
+	  cd "${srcdir}"/"${_stgsrcdir}"
+	  if git merge-base --is-ancestor 2fc5c88068e3dea2612c182ff300511aa2954242 HEAD; then
+	    _staging_args+=(-W xactengine-initial)
+	  fi
+	  cd "${srcdir}"/"${_winesrcdir}"
+	fi
 
 	# Patch to allow Path of Exile to run with DirectX11
 	# https://bugs.winehq.org/show_bug.cgi?id=42695
@@ -1226,10 +1243,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
+	    if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor b0e2d046fc69cc4a4c5aefe383793950b44a1a7b HEAD; then
+	      if git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
+	        _lastcommit="3db619d"
+	      elif git merge-base --is-ancestor b0e2d046fc69cc4a4c5aefe383793950b44a1a7b HEAD; then
 	        _lastcommit="707fcb9"
 	      elif git merge-base --is-ancestor 594814c00ab059d9686ed836b1865f8a94859c8a HEAD; then
 	        _lastcommit="b0e2d04"
@@ -1263,8 +1282,10 @@ EOM
 	      _patchname="valve_proton_fullscreen_hack-staging-$_lastcommit.patch" && _patchmsg="Applied Proton fullscreen hack patch ($_lastcommit)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
+	    if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
+	    elif git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
+	      _patchname='valve_proton_fullscreen_hack-3db619d.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor b0e2d046fc69cc4a4c5aefe383793950b44a1a7b HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-707fcb9.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 594814c00ab059d9686ed836b1865f8a94859c8a HEAD; then
@@ -1289,8 +1310,10 @@ EOM
 
 	# Proton compatible rawinput patchset
 	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && git merge-base --is-ancestor cfcc280905b7804efde8f42bcd6bddbe5ebd8cad HEAD; then
-	  if git merge-base --is-ancestor d5fd3c8a386cf716b1a9695069462be0abd0fa4f HEAD; then
+	  if git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
 	    _patchname='proton-rawinput.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
+	  elif git merge-base --is-ancestor d5fd3c8a386cf716b1a9695069462be0abd0fa4f HEAD; then
+	    _patchname='proton-rawinput-306c40e.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor dbe7694c533ce8bc454248255a2abad66f221e01 HEAD; then
 	    _patchname='proton-rawinput-d5fd3c8.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor 19c6524e48db1d785095953d25591f1e2d2872d9 HEAD; then
@@ -1397,11 +1420,17 @@ EOM
 	  else
 	    _patchname='legacy-LAA.patch' && _patchmsg="Applied large address aware override support (legacy)" && nonuser_patcher
 	  fi
-	elif [ "$_large_address_aware" = "true" ] && git merge-base --is-ancestor 608d086f1b1bb7168e9322c65224c23f34e75f29 HEAD; then
+	elif [ "$_large_address_aware" = "true" ] && git merge-base --is-ancestor 18411a19b4ea3a68234980c56d4c252670dfc000 HEAD; then
 	  if [ "$_use_staging" = "true" ]; then
 	    _patchname='LAA-staging.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
 	  else
 	    _patchname='LAA.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
+	  fi
+	elif [ "$_large_address_aware" = "true" ] && git merge-base --is-ancestor 608d086f1b1bb7168e9322c65224c23f34e75f29 HEAD; then
+	  if [ "$_use_staging" = "true" ]; then
+	    _patchname='LAA-staging-18411a1.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
+	  else
+	    _patchname='LAA-18411a1.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
 	  fi
 	elif [ "$_large_address_aware" = "true" ] && git merge-base --is-ancestor 9f0d66923933d82ae0b09fe5d84f977c1a657cc1 HEAD; then
 	  if [ "$_use_staging" = "true" ]; then
@@ -1432,7 +1461,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
+	  if git merge-base --is-ancestor a302ab44acaf72ecc9b0307c82a7d11f759e6a72 HEAD; then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1478,7 +1507,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor d33cdb84fd8fed24e3a9ce89954ad43213b86426 HEAD && cd "${srcdir}"/"${_winesrcdir}"); then
+	    if git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
+	      _lastcommit="a302ab4"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor d33cdb84fd8fed24e3a9ce89954ad43213b86426 HEAD && cd "${srcdir}"/"${_winesrcdir}"); then
 	      _lastcommit="2633a5c"
 	      _rpc="1"
 	      _stmbits="1"
@@ -1618,8 +1651,10 @@ EOM
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
 	  # SDL Joystick support - from Proton
 	  if [ "$_sdl_joy_support" = "true" ]; then
-	    if git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD; then
+	    if git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
 	      _patchname='proton-sdl-joy.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
+	    elif git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD; then
+	      _patchname='proton-sdl-joy-306c40e.patch' && _patchmsg="Enable SDL Joystick support (from Proton) (<306c40e)" && nonuser_patcher
 	    else
 	      _patchname='proton-sdl-joy-b87256c.patch' && _patchmsg="Enable SDL Joystick support (from Proton) (<b87256c)" && nonuser_patcher
 	    fi

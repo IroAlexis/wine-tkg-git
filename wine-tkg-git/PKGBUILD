@@ -1,11 +1,11 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play
-pkgver=5.10.r0.g8648971f
+pkgver=5.10.r9.gb6595d9e
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
-eval pkgrel=278
+eval pkgrel=282
 
 _stgsrcdir='wine-staging-git'
 _esyncsrcdir='esync'
@@ -285,6 +285,8 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'legacy-LAA-staging.patch' # Same as above, for staging
 		'LAA-608d086.patch' # IMAGE_FILE_LARGE_ADDRESS_AWARE override (<608d086)
 		'LAA-staging-608d086.patch' # Same as above, for staging (<608d086)
+		'LAA-18411a1.patch' # IMAGE_FILE_LARGE_ADDRESS_AWARE override (<18411a1)
+		'LAA-staging-18411a1.patch' # Same as above, for staging (<18411a1)
 		'LAA.patch' # IMAGE_FILE_LARGE_ADDRESS_AWARE override
 		'LAA-staging.patch' # Same as above, for staging
 		'winevulkan-1.1.103.patch' # Update winevulkan
@@ -311,12 +313,14 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'FS_bypass_compositor.patch' # Perf
 		'FS_bypass_compositor-disabler.patch' # Disabler for the actual bypass
 		'valve_proton_fullscreen_hack.patch' # Proton FS hack
+		'valve_proton_fullscreen_hack-3db619d.patch' # Proton FS hack (<3db619d)
 		'valve_proton_fullscreen_hack-707fcb9.patch' # Proton FS hack (<707fcb9)
 		'valve_proton_fullscreen_hack-b0e2d04.patch' # Proton FS hack (<b0e2d04)
 		'valve_proton_fullscreen_hack-594814c.patch' # Proton FS hack (<594814c)
 		'valve_proton_fullscreen_hack-086c686.patch' # Proton FS hack (<086c686)
 		'valve_proton_fullscreen_hack-74dc0c5.patch' # Proton FS hack (<74dc0c5)
 		'valve_proton_fullscreen_hack-staging.patch' # Proton FS hack (staging)
+		'valve_proton_fullscreen_hack-staging-3db619d.patch' # Proton FS hack (<3db619d) (staging)
 		'valve_proton_fullscreen_hack-staging-707fcb9.patch' # Proton FS hack (<707fcb9) (staging)
 		'valve_proton_fullscreen_hack-staging-b0e2d04.patch' # Proton FS hack (<b0e2d04) (staging)
 		'valve_proton_fullscreen_hack-staging-594814c.patch' # Proton FS hack (<594814c) (staging)
@@ -335,6 +339,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'valve_proton_fullscreen_hack_realmodes.patch' # Real modes listing in FS hack
 		'proton_fs_hack_integer_scaling.patch' # Integer scaling for FS hack
 		'proton-rawinput.patch' # Proton compatible rawinput patchset
+		'proton-rawinput-306c40e.patch' # Proton compatible rawinput patchset (<306c40e)
 		'proton-rawinput-d5fd3c8.patch' # Proton compatible rawinput patchset (<d5fd3c8)
 		'proton-rawinput-dbe7694.patch' # Proton compatible rawinput patchset (<dbe7694)
 		'proton-rawinput-19c6524.patch' # Proton compatible rawinput patchset (<19c6524)
@@ -366,6 +371,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-tkg-dedd5cc.patch' # Proton-tkg (<dedd5cc)
 		'proton-tkg-d33cdb8.patch' # Proton-tkg (< staging d33cdb8)
 		'proton-tkg-2633a5c.patch' # Proton-tkg (<2633a5c)
+		'proton-tkg-a302ab4.patch' # Proton-tkg (<a302ab4)
 		'proton-tkg.patch' # Proton-tkg
 		'proton-tkg-rpc.patch' # necessary pre-patch for Proton-tkg
 		'proton-tkg-staging-8d25965.patch' # Proton-tkg-staging (<8d25965)
@@ -394,6 +400,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-tkg-staging-dedd5cc.patch' # Proton-tkg-staging (<dedd5cc)
 		'proton-tkg-staging-d33cdb8.patch' # Proton-tkg-staging (< staging d33cdb8)
 		'proton-tkg-staging-2633a5c.patch' # Proton-tkg-staging (<2633a5c)
+		'proton-tkg-staging-a302ab4.patch' # Proton-tkg-staging (<a302ab4)
 		'proton-tkg-staging.patch' # Proton-tkg-staging
 		'proton-tkg-staging-rpc.patch' # necessary pre-patch for Proton-tkg-staging
 		'proton-tkg-steamclient-swap.patch' # Key steamclient substitution hack
@@ -403,6 +410,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'msvcrt_nativebuiltin-51ffea5a.patch' # Enforce mscvrt Dlls to native then builtin - from Proton (<51ffea5a)
 		'msvcrt_nativebuiltin-eafb4aff.patch' # Enforce mscvrt Dlls to native then builtin - from Proton (<eafb4aff)
 		'proton-sdl-joy.patch' # Proton SDL joystick support
+		'proton-sdl-joy-306c40e.patch' # Proton SDL joystick support (<306c40e)
 		'proton-sdl-joy-b87256c.patch' # Proton SDL joystick support (<b87256c)
 		'proton-sdl-joy-2.patch' # Proton SDL joystick support additions for newer trees
 		'proton-gamepad-additions-50b9456.patch' # Proton 4.2-5 xinput hacks and other gamepad additions (<50b9456)
@@ -564,8 +572,10 @@ md5sums=('SKIP'
          '4368dad1869932648fa1702f2c0053e7'
          'e8306108c5c898ac72d909b136d4cf53'
          'c2291a3cb8ab8457d5289b60f2a43fcc'
-         '51b3e1b240b5fba80c45949c2f503764'
-         '31408a7c467ecae09b769673fcf5adb4'
+         '3c6be3fd6f897cbdde674d05b94b550c'
+         '8a4e72d0b4a926144a79208997dc13a1'
+         '304cdb4144f9a01594353b60ca5366df'
+         'd5e6910bb7319f6e986b69cbe156a379'
          '1c4738e438debf72266b96d09f465b25'
          '9cabed407e00dc03ec4cd9e023285d76'
          'd047619c11d95c4c9bbefae564876950'
@@ -588,13 +598,15 @@ md5sums=('SKIP'
          '2156fa1d317ac7179d36ac179bbb9049'
          '5ca4ee142eafe2c8873d59b2feb51a7d'
          '684d1c60aa38a659b1dd792b1d7cd8f5'
-         '55b07d802333f4383d6b6257c8062381'
+         '1848dc7dd2ce2c6acb3c5ba9f0890ab6'
+         '10a87f9663b8cf1ee4880bd9c5e661c3'
          '72d8a6cc848ea337ce8b627eae43d6f8'
          '0cd41f7ada677a1441d093076c98a894'
          '7793838191ccf67fee6802d5fc8c0be1'
          'e1139317e531f6cfe3633d441bd3eb18'
          '088561d2f36294b7734c315d03f842b3'
-         '180f76784d23dbc5d10d32a3fd1e44d2'
+         '7a362fbd27780120ca6a5b7a3b052666'
+         'e19040d530840e2ae55ff28c6e1d6861'
          '3f02072ea221cb38214762c60a9c3f35'
          '5ccbe6c21419ba1a69ad9a3543b9c6cd'
          '6679453cf783b698d398148dbec6120d'
@@ -612,6 +624,7 @@ md5sums=('SKIP'
          '962fa3a5a4c5fd57b9f4715ed587fbe6'
          '4df9cd990a78606d3cd0dc0673bb141f'
          'a784c182c65c20cbb29b6473abae171d'
+         '8dd4c3d330bcad3faed683aa01eb34b5'
          '875f689721d7aacea801698894804690'
          'fc8ab1c572846227d5cf4ba655800262'
          'dc9b5bfc8e0baeeb94ef217d7a8ad382'
@@ -645,6 +658,7 @@ md5sums=('SKIP'
          '013f23067eb566c47ba4cd4f03a05208'
          '00c29000e451ea5fa22a2f25d453a77f'
          'e9e1b9bf28bbb7b4d5c9e9539c91dc23'
+         '1155b05ff2c1217f128b4260e3b98271'
          '7d9a7cf523c7283c64266148707b8bac'
          'fbc02256e0e85668be75e0275637d6c1'
          '4aa05580e78d36fdbd80f2ef2f46a6b3'
@@ -673,13 +687,15 @@ md5sums=('SKIP'
          'a560dac3c8405e28758c525adf99f14d'
          'b32acd9b9185a5b5fbdd59bbeaee43a0'
          '292dcc842c0c959e3d18bc5b28ab2df6'
+         '3e9c3bd8f0db8123c661c6b6a4d6fa03'
          'f404adafc8648495270e01241cd0601e'
-         'bf7065d93b02f4a993abfb2ae9d079ab'
+         '0e5867170648e00bf2d41d415579cdd3'
          '8681c98f6d488957a206c9c1f2f9547f'
          '3d5518c89320a59400774a86b9a1cf2f'
          '0310c86f736d1c9f35cdabdaedea9396'
          '017e316df9b4a6aada912f3a83e16b08'
          '22d3b0b1ff7f2104312b5eb29959cb2e'
+         '11e6e86fd1e428436b414ca8bfa65725'
          'a60ed4b348b49d9b1b31e14f568cbad9'
          '52f11ca72f4ee06bd2a4bc2b0314e631'
          'aa3d7083feafc62f0c6427e0b98c42e2'
