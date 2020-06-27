@@ -658,46 +658,40 @@ _prepare() {
 
 	# Disable winex11.drv-mouse-coorrds and winex11-MWM_Decorations patchsets on staging for proton FS hack
 	if [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ]; then
-	  cd "${srcdir}"/"${_stgsrcdir}"
-	  if git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && [ "$_broken_staging_44d1a45_localreverts" != "true" ] && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD; then
-	    if git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD; then
+	  if [ "$_broken_staging_44d1a45_localreverts" != "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD ); then
 	      sed -i 's/-@@ -3383,3 +3393,14 @@ DECL_HANDLER(get_rawinput_devices)/-@@ -3432,3 +3442,14 @@ DECL_HANDLER(get_rawinput_devices)/g' "$_where"/staging-44d1a45-localreverts.patch
 	    fi
 	    _patchname='staging-44d1a45-localreverts.patch' && _patchmsg="Applied local reverts for staging 44d1a45 fshack" && nonuser_patcher
 	  fi
-	  if git merge-base --is-ancestor 7cc69d770780b8fb60fb249e007f1a777a03e51a HEAD; then
+	  if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7cc69d770780b8fb60fb249e007f1a777a03e51a HEAD ); then
 	    _staging_args+=(-W winex11.drv-mouse-coorrds -W winex11-MWM_Decorations)
-	    if git merge-base --is-ancestor 938dddf7df920396ac3b30a44768c1582d0c144f HEAD && ! git merge-base --is-ancestor fd3bb06a4c1102cf424bc78ead25ee440db1b0fa HEAD; then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 938dddf7df920396ac3b30a44768c1582d0c144f HEAD && ! git merge-base --is-ancestor fd3bb06a4c1102cf424bc78ead25ee440db1b0fa HEAD ); then
 	      _staging_args+=(-W user32-rawinput)
 	    fi
-	    if git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD; then
-	      if git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD; then
-	        _staging_args+=(-W winex11-key_translation)
-	      else
-	        _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
-	      fi
-	      if ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD; then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	      _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
+	      if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD ); then
 	        _staging_args+=(-W user32-rawinput-keyboard)
 	      fi
 	    fi
 	  fi
-	  cd "${srcdir}"/"${_winesrcdir}"
 	fi
 
 	# Specifically for proton-tkg, our meta patchset breaks with stock staging rawinput patchset, so disable for now, and apply a corresponding fixed winex11-key_translation patchset at a later stage
-	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_proton_fs_hack" != "true" ] && $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && cd "${srcdir}"/"${_winesrcdir}"); then
-	  _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
-	  if $(cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD && cd "${srcdir}"/"${_winesrcdir}"); then
+	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_proton_fs_hack" != "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD ); then
+	  if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	    _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
+	  fi
+	  if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD ); then
 	    _staging_args+=(-W user32-rawinput-keyboard)
 	  fi
-	  cd "${srcdir}"/"${_stgsrcdir}"
-	  if [ "$_proton_fs_hack" = "false" ] && git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && [ "$_broken_staging_44d1a45_localreverts" != "true" ]; then
-	    if git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD; then
+	  if [ "$_proton_fs_hack" = "false" ] && [ "$_broken_staging_44d1a45_localreverts" != "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD ); then
 	      sed -i 's/-@@ -3383,3 +3393,14 @@ DECL_HANDLER(get_rawinput_devices)/-@@ -3432,3 +3442,14 @@ DECL_HANDLER(get_rawinput_devices)/g' "$_where"/staging-44d1a45-localreverts.patch
 	    fi
 	    _patchname='staging-44d1a45-localreverts.patch' && _patchmsg="Applied local reverts for staging 44d1a45 proton-nofshack" && nonuser_patcher
 	  fi
-	  cd "${srcdir}"/"${_winesrcdir}"
 	fi
 
 	# Disable some staging patchsets to prevent bad interactions with proton gamepad additions
@@ -706,19 +700,15 @@ _prepare() {
 	fi
 
 	if ( [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_proton_use_steamhelper" = "true" ] ); then
-	  cd "${srcdir}"/"${_stgsrcdir}"
-	  if git merge-base --is-ancestor 4e7071e4f14f6ce85b0eb4b88accfb0267d6545b HEAD; then
+	  if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 4e7071e4f14f6ce85b0eb4b88accfb0267d6545b HEAD ); then
 	    _staging_args+=(-W server-Desktop_Refcount -W ws2_32-TransmitFile)
 	  fi
-	  cd "${srcdir}"/"${_winesrcdir}"
 	fi
 
 	# Disable broken rawinput patchset that was enabled between e09468e and 5b066d6
-	cd "${srcdir}"/"${_stgsrcdir}"
-	if [ "$_use_staging" = "true" ] && git merge-base --is-ancestor e09468ec178930ac7b1ee33482cd03f0cc136685 HEAD && ! git merge-base --is-ancestor 5b066d6aed7fd90c0be0a2a156b0e5c6cbb44bba HEAD; then
+	if [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor e09468ec178930ac7b1ee33482cd03f0cc136685 HEAD && ! git merge-base --is-ancestor 5b066d6aed7fd90c0be0a2a156b0e5c6cbb44bba HEAD ); then
 	  _staging_args+=(-W user32-rawinput)
 	fi
-	cd "${srcdir}"/"${_winesrcdir}"
 
 	# Disable Staging's `xactengine-initial` patchset to fix BGM on KOF98 & 2002
 	if [ "$_kof98_2002_BGM_fix" = "true" ] && [ "$_use_staging" = "true" ]; then
@@ -1210,7 +1200,7 @@ EOM
 	    elif git merge-base --is-ancestor 1d9a3f6d12322891a2af4aadd66a92ea66479233 HEAD; then
 	      _patchname='fsync-staging-cf04b8d.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (staging <cf04b8d)" && nonuser_patcher
 	    fi
-	    if [ "$_proton_use_steamhelper" != "true" ]; then
+	    if [[ ! ${_staging_args[*]} =~ "server-Desktop_Refcount" ]]; then
 	      _patchname='fsync-staging-no_alloc_handle.patch' && _patchmsg="Added no_alloc_handle object method to fsync" && nonuser_patcher
 	      if ([ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]) || [ "$_protonify" = "true" ] && git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
 	        _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it-no_alloc_handle.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch (no_alloc_handle edition)" && nonuser_patcher
@@ -1352,7 +1342,7 @@ EOM
 	  else
 	    _patchname='proton-rawinput-74dc0c5.patch' && _patchmsg="Using rawinput patchset (<74dc0c5)" && nonuser_patcher
 	  fi
-	  if [[ ! ${_staging_userargs[*]} =~ "winex11-key_translation" ]] && $(cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && cd "${srcdir}"/"${_winesrcdir}"); then # Apply staging winex11-key_translation patchset post staging-application when enabled
+	  if [[ ! ${_staging_userargs[*]} =~ "winex11-key_translation" ]] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then # Apply staging winex11-key_translation patchset post staging-application when enabled
 	      cp -u "${srcdir}"/"${_stgsrcdir}"/patches/winex11-key_translation/*.patch "$_where"/ && ln -s -f "${srcdir}"/"${_stgsrcdir}"/patches/winex11-key_translation/*.patch "${srcdir}"/
 	      _patchname='0001-winex11-Match-keyboard-in-Unicode.patch' && _patchmsg="Applied proton friendly winex11-Match-keyboard-in-Unicode" && nonuser_patcher
 	      _patchname='0002-winex11-Fix-more-key-translation.patch' && _patchmsg="Applied proton friendly winex11-Fix-more-key-translation" && nonuser_patcher
@@ -1475,7 +1465,7 @@ EOM
 	fi
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
-	  if [ "$_proton_fs_hack" != "true" ] && [ "$_use_staging" = "true" ]; then
+	  if [ "$_proton_fs_hack" != "true" ] && [ "$_use_staging" = "true" ] && [[ ! ${_staging_userargs[*]} =~ "winex11-key_translation" ]] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
 	    _patchname='staging-winex11-key_translation.patch' && _patchmsg="Applied non-fshack friendly staging winex11-key_translation patchset" && nonuser_patcher
 	  fi
 	  if [ "$_steamclient_noswap" != "true" ] && git merge-base --is-ancestor b7db0b52cee65a008f503ce727befcad3ba8d28a HEAD; then

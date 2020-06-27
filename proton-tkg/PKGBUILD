@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.11.r10.g37fc290f
+pkgver=5.11.r11.gb6c28187
 pkgrel=1
 _frogwhere="$PWD"
 export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
@@ -168,6 +168,8 @@ prepare() {
   mkdir -p vkd3d-fork-build
   mkdir -p liberation-fonts
   mkdir -p dxvk
+  mkdir -p mono
+  mkdir -p gecko
   ln -s -f "${_frogwhere}/Proton" "${srcdir}/"
   ln -s -f "${_frogwhere}/vkd3d-fork-build" "${srcdir}/"
   ln -s -f "${_frogwhere}/liberation-fonts" "${srcdir}/"
@@ -177,6 +179,8 @@ prepare() {
   ln -s -f "${_frogwhere}/proton-tkg.sh" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg-userpatches" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg-profiles" "${srcdir}/"
+  ln -s -f "${_frogwhere}/mono" "${srcdir}/"
+  ln -s -f "${_frogwhere}/gecko" "${srcdir}/"
 }
 
 build() {
