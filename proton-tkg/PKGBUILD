@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.10.r12.g03f5adca
+pkgver=5.11.r10.g37fc290f
 pkgrel=1
 _frogwhere="$PWD"
 export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
@@ -27,8 +27,7 @@ depends=(
     'libpcap'               'lib32-libpcap'
     'faudio'                'lib32-faudio'
     'desktop-file-utils'    'tk'
-    'wine-mono'             'vulkan-icd-loader'
-    'lib32-vulkan-icd-loader'
+    'vulkan-icd-loader'     'lib32-vulkan-icd-loader'
 )
 makedepends=(
     'git'                   'autoconf'

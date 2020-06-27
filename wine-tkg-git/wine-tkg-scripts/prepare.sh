@@ -336,6 +336,12 @@ _describe_other() {
   git describe --long --tags --always | sed 's/\([^-]*-g\)/r\1/;s/-/./g;s/^v//'
 }
 
+_committer() {
+  if [ "$_generate_patchsets" != "false" ]; then
+    ( git add . && git commit -m "$_commitmsg" && git format-patch -n HEAD^ || true ) >/dev/null 2>&1
+  fi
+}
+
 _source_cleanup() {
 	if [ "$_NUKR" != "debug" ]; then
 	  if [ "$_use_staging" = "true" ]; then
@@ -416,6 +422,7 @@ _prepare() {
 	fi
 
 	echo "" >> "$_where"/last_build_config.log
+	echo -e "*.patch\n*.orig\n*~\n.gitignore\nautom4te.cache/*" > "${srcdir}"/"${_winesrcdir}"/.gitignore
 
 	# Disable local Esync on 553986f
 	if [ "$_use_staging" = "true" ]; then
@@ -521,11 +528,6 @@ _prepare() {
 	  echo -e "( Warframe Launcher unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
-	if [ "$_origin_fix" = "true" ] && git merge-base --is-ancestor 3078f10d43d834b0498358fe0accb565191b7020 HEAD; then
-	  _committorevert=3078f10d43d834b0498358fe0accb565191b7020 && nonuser_reverter
-	  echo -e "( Origin unbreak revert applied )\n" >> "$_where"/last_build_config.log
-	fi
-
 	if [ "$_proton_fs_hack" = "true" ]; then
 	  if ! git merge-base --is-ancestor aee91dc4ac08428e74fbd21f97438db38f84dbe5 HEAD; then
 	    _committorevert=427152ec7b4ee85631617b693dbf1deea763c0ba && nonuser_reverter
@@ -540,6 +542,8 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then
+	    _committorevert=6f9d20806e821ab07c8adf81ae6630fae94b00ef && nonuser_reverter
+	    _committorevert=145cfce1135a7e59cc4c89cd05b572403f188161 && nonuser_reverter
 	    _committorevert=e3eb89d5ebb759e975698b97ed8b547a9de3853f && nonuser_reverter
 	    _committorevert=707fcb99a60015fcbb20c83e9031bc5be7a58618 && nonuser_reverter
 	    _committorevert=8cd6245b7633abccd68f73928544ae4de6f76d52 && nonuser_reverter
@@ -571,6 +575,8 @@ _prepare() {
 	  echo -e "( Kernelbase reverts clean reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
+	_commitmsg="01-reverts" _committer
+
 	# Hotfixer-staging
 	if [ "$_use_staging" = "true" ]; then
 	  cd "${srcdir}"/"${_stgsrcdir}" && _userpatch_target="wine-staging" _userpatch_ext="mystaging" hotfixer && cd "${srcdir}"/"${_winesrcdir}"
@@ -588,6 +594,9 @@ _prepare() {
 	# Update winevulkan
 	if [ "$_update_winevulkan" = "true" ] && ! git merge-base --is-ancestor 3e4189e3ada939ff3873c6d76b17fb4b858330a8 HEAD && git merge-base --is-ancestor eb39d3dbcac7a8d9c17211ab358cda4b7e07708a HEAD; then
 	  _patchname='winevulkan-1.1.103.patch' && _patchmsg="Applied winevulkan 1.1.103 patch" && nonuser_patcher
+	fi
+	if ( [ "$_update_winevulkan" = "true" ] || [ "$_proton_fs_hack" = "true" ] ) && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor df2fd22e4de96b28eb0ced5e8aa9bf4c421b5ed8 HEAD ); then
+	  _staging_args+=(-W winevulkan-vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
 	fi
 
 	# use CLOCK_MONOTONIC instead of CLOCK_MONOTONIC_RAW in ntdll/server - lowers overhead
@@ -650,7 +659,7 @@ _prepare() {
 	# Disable winex11.drv-mouse-coorrds and winex11-MWM_Decorations patchsets on staging for proton FS hack
 	if [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ]; then
 	  cd "${srcdir}"/"${_stgsrcdir}"
-	  if git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && [ "$_broken_staging_44d1a45_localreverts" != "true" ]; then
+	  if git merge-base --is-ancestor 44d1a45e983ed8c04390068ded61294e2004d2f6 HEAD && [ "$_broken_staging_44d1a45_localreverts" != "true" ] && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD; then
 	    if git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD; then
 	      sed -i 's/-@@ -3383,3 +3393,14 @@ DECL_HANDLER(get_rawinput_devices)/-@@ -3432,3 +3442,14 @@ DECL_HANDLER(get_rawinput_devices)/g' "$_where"/staging-44d1a45-localreverts.patch
 	    fi
@@ -662,7 +671,11 @@ _prepare() {
 	      _staging_args+=(-W user32-rawinput)
 	    fi
 	    if git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD; then
-	      _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
+	      if git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD; then
+	        _staging_args+=(-W winex11-key_translation)
+	      else
+	        _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
+	      fi
 	      if ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD; then
 	        _staging_args+=(-W user32-rawinput-keyboard)
 	      fi
@@ -837,12 +850,15 @@ _prepare() {
 	  cd "${srcdir}"/"${_winesrcdir}"
 	fi
 
+	_commitmsg="02-pre-staging" _committer
+
 	if [ "$_use_staging" = "true" ] && [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW2" = "y" ]; then
 	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args[@]}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
 	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}" >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
 
 	  # Remove staging version tag
 	  sed -i "s/  (Staging)//g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
+	  _commitmsg="03-staging" _committer
 	fi
 
 	# esync
@@ -1177,6 +1193,8 @@ EOM
 	  if [ "$_staging_esync" = "true" ]; then
 	    if git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
 	      _patchname='fsync-staging.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (staging)" && nonuser_patcher
+	    elif git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
+	      _patchname='fsync-staging-27a52d0.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (staging)" && nonuser_patcher
 	    elif git merge-base --is-ancestor e5030a4ac0a303d6788ae79ffdcd88e66cf78bd2 HEAD; then
 	      _patchname='fsync-staging-2633a5c.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (staging)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 40e849ffa46ae3cd060e2db83305dda1c4d2648e HEAD; then
@@ -1250,10 +1268,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
+	    if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
+	      if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
+	        _lastcommit="408a5a8"
+	      elif git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
 	        _lastcommit="3db619d"
 	      elif git merge-base --is-ancestor b0e2d046fc69cc4a4c5aefe383793950b44a1a7b HEAD; then
 	        _lastcommit="707fcb9"
@@ -1289,8 +1309,10 @@ EOM
 	      _patchname="valve_proton_fullscreen_hack-staging-$_lastcommit.patch" && _patchmsg="Applied Proton fullscreen hack patch ($_lastcommit)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
+	    if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
+	    elif git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
+	      _patchname='valve_proton_fullscreen_hack-408a5a8.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-3db619d.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor b0e2d046fc69cc4a4c5aefe383793950b44a1a7b HEAD; then
@@ -1468,7 +1490,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if git merge-base --is-ancestor a302ab44acaf72ecc9b0307c82a7d11f759e6a72 HEAD; then
+	  if git merge-base --is-ancestor 0556d9e6f1c0951e6e4026efe3b176407b82fc7b HEAD; then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1514,7 +1536,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
+	    if git merge-base --is-ancestor a302ab44acaf72ecc9b0307c82a7d11f759e6a72 HEAD; then
+	      _lastcommit="0556d9e"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
 	      _lastcommit="a302ab4"
 	      _rpc="1"
 	      _stmbits="1"
@@ -1717,21 +1743,25 @@ EOM
 	fi
 
 	# Proton fs hack additions
-	if git merge-base --is-ancestor 3e4189e3ada939ff3873c6d76b17fb4b858330a8 HEAD && [ "$_proton_fs_hack" = "true" ]; then
+	if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD && [ "$_proton_fs_hack" = "true" ]; then
 	  _patchname='proton-vk-bits-4.5.patch' && _patchmsg="Enable Proton vulkan bits for 4.5+" && nonuser_patcher
+	elif git merge-base --is-ancestor 3e4189e3ada939ff3873c6d76b17fb4b858330a8 HEAD && [ "$_proton_fs_hack" = "true" ]; then
+	  _patchname='proton-vk-bits-4.5-408a5a8.patch' && _patchmsg="Enable Proton vulkan bits for 4.5+" && nonuser_patcher
 	fi
 	if git merge-base --is-ancestor 458e0ad5133c9a449e22688a89183f3a6ab286e4 HEAD && [ "$_proton_fs_hack" = "true" ]; then
 	  _patchname='proton_fs_hack_integer_scaling.patch' && _patchmsg="Enable Proton fs hack integer scaling" && nonuser_patcher
 	fi
 	if [ "$_update_winevulkan" = "true" ] && git merge-base --is-ancestor 7e736b5903d3d078bbf7bb6a509536a942f6b9a0 HEAD; then
-	  if git merge-base --is-ancestor d2f552d1508dbabb595eae23db9e5c157eaf9b41 HEAD; then
+	  if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
 	    if [ "$_proton_fs_hack" = "true" ]; then
 	      _patchname='proton-winevulkan.patch' && _patchmsg="Using Proton winevulkan patches" && nonuser_patcher
 	    else
 	      _patchname='proton-winevulkan-nofshack.patch' && _patchmsg="Using Proton winevulkan patches (nofshack)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor 594814c00ab059d9686ed836b1865f8a94859c8a HEAD; then
+	    if git merge-base --is-ancestor d2f552d1508dbabb595eae23db9e5c157eaf9b41 HEAD; then
+	      _lastcommit="408a5a8"
+	    elif git merge-base --is-ancestor 594814c00ab059d9686ed836b1865f8a94859c8a HEAD; then
 	      _lastcommit="d2f552d"
 	    elif git merge-base --is-ancestor 086c686e817a596e35c41dd5b37f3c28587af9d5 HEAD; then
 	      _lastcommit="594814c"
@@ -1798,14 +1828,15 @@ EOM
 	fi
 
 	echo -e "" >> "$_where"/last_build_config.log
+	_commitmsg="04-post-staging" _committer
 
 	# wine user patches
 	if [ "$_user_patches" = "true" ]; then
 	  _userpatch_target="plain-wine"
 	  _userpatch_ext="my"
 	  cd "${srcdir}"/"${_winesrcdir}"
-	  hotfixer
-	  user_patcher
+	  hotfixer && _commitmsg="05-hotfixes" _committer
+	  user_patcher && _commitmsg="06-userpatches" _committer
 	fi
 
 	echo "" >> "$_where"/last_build_config.log
@@ -1869,12 +1900,11 @@ EOM
 	# fix path of opencl headers
 	sed 's|OpenCL/opencl.h|CL/opencl.h|g' -i configure*
 
+	_commitmsg="07-tags-n-polish" _committer
+
 	if [ "$_NUKR" != "debug" ]; then
 	  # delete old build dirs (from previous builds)
 	  rm -rf "${srcdir}"/wine-tkg-*-{32,64}-build
-	elif [ $(git log -1 --pretty=%B | grep -c "wine-tkg patches") = 0 ]; then
-	  git add .
-	  git commit -m "wine-tkg patches"
 	fi
 
 	# no compilation
