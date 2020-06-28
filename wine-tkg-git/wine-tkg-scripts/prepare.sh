@@ -297,7 +297,9 @@ user_patcher() {
 	        msg2 ""
 	        msg2 "######################################################"
 	        echo -e "\nReverting your own patch ${_f##*/}" >> "$_where"/prepare.log
-	        patch -Np1 -R < "${_f}" >> "$_where"/prepare.log || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
+	        if ! patch -Np1 -R < "${_f}" >> "$_where"/prepare.log; then
+	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1
+	        fi
 	        echo -e "Reverted your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
 	    done
@@ -320,7 +322,9 @@ user_patcher() {
 	        msg2 ""
 	        msg2 "######################################################"
 	        echo -e "\nApplying your own patch ${_f##*/}" >> "$_where"/prepare.log
-	        patch -Np1 < "${_f}" >> "$_where"/prepare.log || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
+	        if ! patch -Np1 < "${_f}" >> "$_where"/prepare.log; then
+	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1
+	        fi
 	        echo -e "Applied your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
 	    done
@@ -554,7 +558,7 @@ _prepare() {
 	  fi
 	fi
 
-	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 26c1131201f8fd9918a01231a7eb6f1989400858 HEAD ); then
+	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 26c1131201f8fd9918a01231a7eb6f1989400858 HEAD ) && ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
 	  _committorevert=306c40e67319cae8e4c448ec8fc8d3996f87943f && nonuser_reverter
 	  _committorevert=26c1131201f8fd9918a01231a7eb6f1989400858 && nonuser_reverter
 	  echo -e "( Proton rawinput unbreak reverts applied )\n" >> "$_where"/last_build_config.log
@@ -1329,8 +1333,10 @@ EOM
 
 	# Proton compatible rawinput patchset
 	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && git merge-base --is-ancestor cfcc280905b7804efde8f42bcd6bddbe5ebd8cad HEAD; then
-	  if git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
+	  if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
 	    _patchname='proton-rawinput.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
+	  elif git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
+	    _patchname='proton-rawinput-27a52d0.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor d5fd3c8a386cf716b1a9695069462be0abd0fa4f HEAD; then
 	    _patchname='proton-rawinput-306c40e.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor dbe7694c533ce8bc454248255a2abad66f221e01 HEAD; then
