@@ -666,7 +666,7 @@ _prepare() {
 	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD ); then
 	      sed -i 's/-@@ -3383,3 +3393,14 @@ DECL_HANDLER(get_rawinput_devices)/-@@ -3432,3 +3442,14 @@ DECL_HANDLER(get_rawinput_devices)/g' "$_where"/staging-44d1a45-localreverts.patch
 	    fi
-	    _patchname='staging-44d1a45-localreverts.patch' && _patchmsg="Applied local reverts for staging 44d1a45 fshack" && nonuser_patcher
+	    cd "${srcdir}"/"${_stgsrcdir}" && _patchname='staging-44d1a45-localreverts.patch' _patchmsg="Applied local reverts for staging 44d1a45 fshack" nonuser_patcher && cd "${srcdir}"/"${_winesrcdir}"
 	  fi
 	  if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7cc69d770780b8fb60fb249e007f1a777a03e51a HEAD ); then
 	    _staging_args+=(-W winex11.drv-mouse-coorrds -W winex11-MWM_Decorations)
@@ -678,6 +678,8 @@ _prepare() {
 	      if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD ); then
 	        _staging_args+=(-W user32-rawinput-keyboard)
 	      fi
+	    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor f904ca32a3f678bf829a325dc66699a21e510857 HEAD ); then
+	      _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-mouse-experimental -W user32-rawinput-hid)
 	    fi
 	  fi
 	fi
@@ -686,6 +688,8 @@ _prepare() {
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_proton_fs_hack" != "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 8218a789558bf074bd26a9adf3bbf05bdb9cb88e HEAD ); then
 	  if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
 	    _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-nolegacy -W user32-rawinput-mouse-experimental -W user32-rawinput-hid -W winex11-key_translation)
+	  elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor f904ca32a3f678bf829a325dc66699a21e510857 HEAD ); then
+	    _staging_args+=(-W user32-rawinput-mouse -W user32-rawinput-mouse-experimental -W user32-rawinput-hid)
 	  fi
 	  if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor d8496cacd170347bbde755ead066be8394fbb82b HEAD ); then
 	    _staging_args+=(-W user32-rawinput-keyboard)
@@ -694,7 +698,7 @@ _prepare() {
 	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 437038604a09c7952a52b28c373cfbe706d8e78b HEAD ); then
 	      sed -i 's/-@@ -3383,3 +3393,14 @@ DECL_HANDLER(get_rawinput_devices)/-@@ -3432,3 +3442,14 @@ DECL_HANDLER(get_rawinput_devices)/g' "$_where"/staging-44d1a45-localreverts.patch
 	    fi
-	    _patchname='staging-44d1a45-localreverts.patch' && _patchmsg="Applied local reverts for staging 44d1a45 proton-nofshack" && nonuser_patcher
+	    cd "${srcdir}"/"${_stgsrcdir}" && _patchname='staging-44d1a45-localreverts.patch' _patchmsg="Applied local reverts for staging 44d1a45 proton-nofshack" nonuser_patcher && cd "${srcdir}"/"${_winesrcdir}"
 	  fi
 	fi
 
@@ -1262,10 +1266,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
+	    if git merge-base --is-ancestor 5dd03cbc8f5cc8fa349d1ce0f155139094eff56c HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
+	      if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
+	        _lastcommit="5dd03cb"
+	      elif git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
 	        _lastcommit="408a5a8"
 	      elif git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
 	        _lastcommit="3db619d"
@@ -1303,8 +1309,10 @@ EOM
 	      _patchname="valve_proton_fullscreen_hack-staging-$_lastcommit.patch" && _patchmsg="Applied Proton fullscreen hack patch ($_lastcommit)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
+	    if git merge-base --is-ancestor 5dd03cbc8f5cc8fa349d1ce0f155139094eff56c HEAD; then
 	      _patchname='valve_proton_fullscreen_hack.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
+	    elif git merge-base --is-ancestor 408a5a86ec30e293bf9e6eec4890d552073a82e8 HEAD; then
+	      _patchname='valve_proton_fullscreen_hack-5dd03cb.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 3db619d46e70a398a06001573fb42b0a32d81209 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-408a5a8.patch' && _patchmsg="Applied Proton fullscreen hack patch (mainline)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 707fcb99a60015fcbb20c83e9031bc5be7a58618 HEAD; then
@@ -1333,8 +1341,10 @@ EOM
 
 	# Proton compatible rawinput patchset
 	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && git merge-base --is-ancestor cfcc280905b7804efde8f42bcd6bddbe5ebd8cad HEAD; then
-	  if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	  if git merge-base --is-ancestor 3a9edf9aad43c3e8ba724571da5381f821f1dc56 HEAD; then
 	    _patchname='proton-rawinput.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
+	  elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 82cff8bbdbc133cc14cdb9befc36c61c3e49c242 HEAD ); then
+	    _patchname='proton-rawinput-3a9edf9.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
 	    _patchname='proton-rawinput-27a52d0.patch' && _patchmsg="Using rawinput patchset" && nonuser_patcher
 	  elif git merge-base --is-ancestor d5fd3c8a386cf716b1a9695069462be0abd0fa4f HEAD; then
