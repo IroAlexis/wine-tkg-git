@@ -64,7 +64,13 @@ if ( [ "$_staging_esync" = "true" ] || [ "$_use_esync" = "true" ] || [ "$_use_fs
     fi
 
     # staging unbreak - #1
-    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor cbdc68f558627cd09404c9ab4768d1c38353f383 HEAD ); then
+    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 2e111fae102c9b00238ab0a7b09efff069198dd1 HEAD ); then
+      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/06877e55b1100cc49d3726e9a70f31c4dfbe66f8-38)
+    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 9cca205cc2e024ae786fdebe398b900a119f197d HEAD ); then
+      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/06877e55b1100cc49d3726e9a70f31c4dfbe66f8-37)
+    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 502c444d9c48500f07e5dddeb47a7acfb45be9f2 HEAD ); then
+      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/06877e55b1100cc49d3726e9a70f31c4dfbe66f8-36)
+    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor cbdc68f558627cd09404c9ab4768d1c38353f383 HEAD ); then
       _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/06877e55b1100cc49d3726e9a70f31c4dfbe66f8-35)
     elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 70f6f6d7e40c041b9e3674f1273bc17763d612aa HEAD ); then
       _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/06877e55b1100cc49d3726e9a70f31c4dfbe66f8-34)
@@ -155,10 +161,10 @@ if ( [ "$_staging_esync" = "true" ] || [ "$_use_esync" = "true" ] || [ "$_use_fs
       _staging_args+=(-W ntdll-ForceBottomUpAlloc) # Disable the patchset from 676f261e to 044cb930 due to breakage
     fi
 
-    # Import rebased 537bb7a8 and b7ccb9d0 back
-    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor b7ccb9d06a897a384b71ccb959b431168ca07e03 HEAD ); then
-      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/001-ntdll_537bb7a8 "$_where"/wine-tkg-patches/hotfixes/01150d7f/002-ntdll_b7ccb9d0)
-    fi
+    # Import rebased 537bb7a8 and b7ccb9d0 back - Breaks Blizzard games
+    #if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor b7ccb9d06a897a384b71ccb959b431168ca07e03 HEAD ); then
+    #  _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/01150d7f/001-ntdll_537bb7a8 "$_where"/wine-tkg-patches/hotfixes/01150d7f/002-ntdll_b7ccb9d0)
+    #fi
 
     # Import hotfix-rebased 01143089 - Fixes Origin
     if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 3078f10d43d834b0498358fe0accb565191b7020 HEAD ); then
