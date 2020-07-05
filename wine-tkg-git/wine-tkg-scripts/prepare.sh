@@ -238,13 +238,13 @@ _pkgnaming() {
     msg2 "Overriding default pkgname. New pkgname: ${pkgname}"
   else
     if [ "$_use_staging" = "true" ]; then
-      pkgname="${pkgname/%-git/-staging-git}"
+#      pkgname="${pkgname/%-git/-staging-git}"
       msg2 "Using staging patchset"
     fi
 
     if [ "$_use_esync" = "true" ]; then
       if [ "$_use_fsync" = "true" ]; then
-        pkgname="${pkgname/%-git/-fsync-git}"
+#        pkgname="${pkgname/%-git/-fsync-git}"
         msg2 "Using fsync patchset"
       else
         pkgname="${pkgname/%-git/-esync-git}"
@@ -258,19 +258,19 @@ _pkgnaming() {
     fi
 
     if [ "$_use_legacy_gallium_nine" = "true" ]; then
-      pkgname="${pkgname/%-git/-nine-git}"
+#      pkgname="${pkgname/%-git/-nine-git}"
       msg2 "Using gallium nine patchset (legacy)"
     fi
 
     if [ "$_use_vkd3d" = "mainline" ] || [ "$_use_vkd3d" = "fork" ]; then
-      pkgname="${pkgname/%-git/-vkd3d-git}"
+#      pkgname="${pkgname/%-git/-vkd3d-git}"
       msg2 "Using VKD3D for d3d12 translation"
     fi
   fi
 
   # External install
   if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
-    pkgname="${pkgname/%-git/-$_EXTERNAL_INSTALL_TYPE-git}"
+#    pkgname="${pkgname/%-git/-$_EXTERNAL_INSTALL_TYPE-git}"
     msg2 "Installing to $_DEFAULT_EXTERNAL_PATH/$pkgname"
   elif [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]; then
     pkgname="proton_dist"
