@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.12.r1.g3f3a05f9
+pkgver=5.13.r2.g4373a101
 pkgrel=1
 _frogwhere="$PWD"
 export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
@@ -64,7 +64,7 @@ makedepends=(
     'glslang'               'wget'
     'ocl-icd'               'lib32-ocl-icd'
     'vkd3d'                 'lib32-vkd3d'
-    'opencl-headers'
+    'opencl-headers'        $_user_makedeps
 )
 optdepends=(
     'giflib'                'lib32-giflib'
@@ -165,13 +165,13 @@ pkgver() {
 prepare() {
   cd ${_frogwhere}
   mkdir -p Proton
-  mkdir -p vkd3d-fork-build
+  mkdir -p vkd3d-proton
   mkdir -p liberation-fonts
   mkdir -p dxvk
   mkdir -p mono
   mkdir -p gecko
   ln -s -f "${_frogwhere}/Proton" "${srcdir}/"
-  ln -s -f "${_frogwhere}/vkd3d-fork-build" "${srcdir}/"
+  ln -s -f "${_frogwhere}/vkd3d-proton" "${srcdir}/"
   ln -s -f "${_frogwhere}/liberation-fonts" "${srcdir}/"
   ln -s -f "${_frogwhere}/dxvk" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton_template" "${srcdir}/"

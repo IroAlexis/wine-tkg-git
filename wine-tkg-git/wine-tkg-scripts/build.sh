@@ -42,6 +42,11 @@ _prebuild_common() {
 	echo "LDFLAGS = ${LDFLAGS}" >> "$_where"/last_build_config.log
 	echo "CROSSCFLAGS = ${CROSSCFLAGS}" >> "$_where"/last_build_config.log
 	echo "CROSSLDFLAGS = ${CROSSLDFLAGS}" >> "$_where"/last_build_config.log
+
+	# Disable tests by default, enable back with _enable_tests="true"
+	if [ "$_ENABLE_TESTS" != "true" ]; then
+	  _configure_args+=(--disable-tests)
+	fi
 }
 
 _build() {
@@ -129,6 +134,13 @@ _build() {
 	fi
 }
 
+_generate_debian_package() {
+	_prefix=$1
+
+	msg2 'Generating a Debian package'
+	"$_where"/wine-tkg-scripts/package-debian.sh "${pkgdir}" "${_prefix}" "${_where}" "${pkgname}-${pkgver}.deb" "${pkgver}" "${pkgname}"
+}
+
 _package_nomakepkg() {
 	if [ "$_nomakepkg_nover" = "true" ] ; then
 	  _nomakepkg_pkgname="${pkgname}"
@@ -188,10 +200,11 @@ _package_nomakepkg() {
 
 	# wine-tkg path scripts - Might be useful for external builds when using weird env vars - Also workarounds wrong paths issues on non-Arch distros
 	cp -v "$_where"/wine-tkg-scripts/wine-tkg "$_prefix"/bin/wine-tkg
+	cp -v "$_where"/wine-tkg-scripts/wine64-tkg "$_prefix"/bin/wine64-tkg
 	cp -v "$_where"/wine-tkg-scripts/wine-tkg-interactive "$_prefix"/bin/wine-tkg-interactive
 
 	# strip
-	if [ "$_nomakepkg_strip" = "true" ]; then
+	if [ "$_pkg_strip" = "true" ]; then
 	  for _f in "$_prefix"/{bin,lib,lib32,lib64}/{wine/*,*}; do
 	    if [[ "$_f" = *.so ]] || [[ "$_f" = *.dll ]]; then
 	      strip --strip-unneeded "$_f"
@@ -211,6 +224,10 @@ _package_nomakepkg() {
 	  pkgdir="$_where/non-makepkg-builds/${_nomakepkg_pkgname}"
 	else
 	  pkgdir="${_nomakepkg_prefix_path}/${_nomakepkg_pkgname}"
+	fi
+
+	if [ "$_GENERATE_DEBIAN_PACKAGE" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
+		_generate_debian_package "$_prefix"
 	fi
 
 	if [ "$_use_esync" = "true" ] || [ "$_staging_esync" = "true" ]; then
@@ -318,9 +335,14 @@ _package_makepkg() {
 
 	# wine-tkg path scripts - Might be useful for external builds when using weird env vars - Also workarounds wrong paths issues on non-Arch distros
 	cp "$_where"/wine-tkg-scripts/wine-tkg "${pkgdir}$_prefix"/bin/wine-tkg
+	cp "$_where"/wine-tkg-scripts/wine64-tkg "${pkgdir}$_prefix"/bin/wine64-tkg
 	cp "$_where"/wine-tkg-scripts/wine-tkg-interactive "${pkgdir}$_prefix"/bin/wine-tkg-interactive
 
 	cp "$_where"/last_build_config.log "${pkgdir}$_prefix"/share/wine/wine-tkg-config.txt
+
+	if [ "$_GENERATE_DEBIAN_PACKAGE" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
+		_generate_debian_package "$_prefix"
+	fi
 
 	if [ "$_use_esync" = "true" ] || [ "$_staging_esync" = "true" ]; then
 	  msg2 '##########################################################################################################################'

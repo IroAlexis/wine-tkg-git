@@ -16,9 +16,6 @@ _nowhere="$PWD"
 _nomakepkg="true"
 _no_steampath="false"
 
-# Build vkd3d - Requires Wine installed system-wide
-_build_vkd3d="false"
-
 # Enforce using makepkg when using --makepkg
 if [ "$1" = "--makepkg" ]; then
   _nomakepkg="false"
@@ -154,36 +151,30 @@ function build_lsteamclient {
 
 function build_vkd3d {
   cd "$_nowhere"
-  mkdir -p vkd3d-fork-build && cd vkd3d-fork-build
-  git clone https://github.com/HansKristian-Work/vkd3d.git || true # It'll complain the path already exists on subsequent builds
-  cd vkd3d
+  git clone https://github.com/HansKristian-Work/vkd3d-proton.git || true # It'll complain the path already exists on subsequent builds
+  cd vkd3d-proton
   git reset --hard HEAD
   git clean -xdf
   git pull origin master
-  ./autogen.sh
-  cd ..
-
-  export CFLAGS="-O2 -g -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
-  export CXXFLAGS="-Wno-attributes -O2 -g -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
-  export PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
+  git submodule update --init --recursive
 
   rm -rf build/lib64-vkd3d
   rm -rf build/lib32-vkd3d
-  mkdir -p build/lib64-vkd3d/out
-  mkdir -p build/lib32-vkd3d/out
+  mkdir -p build/lib64-vkd3d
+  mkdir -p build/lib32-vkd3d
 
-  export CC='gcc -m64'
-  export CXX='g++ -m64'
-  cd build/lib64-vkd3d
-  "$_nowhere"/vkd3d-fork-build/vkd3d/configure --prefix="$_nowhere/vkd3d-fork-build/build/lib64-vkd3d/out" --with-spirv-tools
-  make -j$(nproc) -C "$_nowhere/vkd3d-fork-build/build/lib64-vkd3d" && make install
-  cd ../..
+  export CFLAGS="-pipe -O2 -ftree-vectorize"
+  export CPPFLAGS="-pipe -O2 -ftree-vectorize"
+  export CXXFLAGS="-pipe -O2 -ftree-vectorize"
+  export LDFLAGS="-Wl,-O1,--sort-common,--as-needed"
 
-  export CC='gcc -m32'
-  export CXX='g++ -m32'
-  cd build/lib32-vkd3d
-  "$_nowhere"/vkd3d-fork-build/vkd3d/configure --prefix="$_nowhere/vkd3d-fork-build/build/lib32-vkd3d/out" --with-spirv-tools
-  make -j$(nproc) -C "$_nowhere/vkd3d-fork-build/build/lib32-vkd3d" && make install
+  meson --cross-file build-win64.txt -Denable_standalone_d3d12=True --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib64-vkd3d "$_nowhere"/vkd3d-proton/build/lib64-vkd3d
+  cd "$_nowhere"/vkd3d-proton/build/lib64-vkd3d && ninja install
+  cd "$_nowhere"/vkd3d-proton
+
+  meson --cross-file build-win32.txt -Denable_standalone_d3d12=True  --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib32-vkd3d "$_nowhere"/vkd3d-proton/build/lib32-vkd3d
+  cd "$_nowhere"/vkd3d-proton/build/lib32-vkd3d && ninja install
+
   cd $_nowhere
 }
 
@@ -395,11 +386,6 @@ else
 
   rm -rf "$_nowhere"/proton_dist_tmp
 
-  # Build vkd3d
-  if [ "$_build_vkd3d" = "true" ]; then
-    build_vkd3d
-  fi
-
   cd "$_nowhere"
 
   # We'll need a token to register to wine-tkg-git - keep one for us to steal wine-tkg-git options later
@@ -416,6 +402,22 @@ else
 
   # Wine-tkg-git has injected versioning and settings in the token for us, so get the values back
   source "$_nowhere/proton_tkg_token"
+
+  # Use custom compiler paths if defined
+  if [ -n "${CUSTOM_MINGW_PATH}" ]; then
+    PATH="${PATH}:${CUSTOM_MINGW_PATH}/bin:${CUSTOM_MINGW_PATH}/lib:${CUSTOM_MINGW_PATH}/include"
+  fi
+  if [ -n "${CUSTOM_GCC_PATH}" ]; then
+    PATH="${CUSTOM_GCC_PATH}/bin:${CUSTOM_GCC_PATH}/lib:${CUSTOM_GCC_PATH}/include:${PATH}"
+  fi
+
+  # If mingw-w64 gcc can't be found, disable building vkd3d-proton
+  if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+    echo -e "######\nmingw-w64 gcc not found - vkd3d-proton won't be built\n######"
+    _build_vkd3d="false"
+  else
+    echo -e "######\nmingw-w64 gcc found\n######"
+  fi
 
   # Copy the resulting package in here to begin our work
   if [ -e "$_proton_pkgdest"/../HL3_confirmed ]; then
@@ -464,7 +466,8 @@ else
     fontforge -script "$_nowhere/Proton/fonts/scripts/generatefont.pe" "$_nowhere/proton_template/share/fonts/LiberationMono-Regular" "CourierNew" "Courier New" "Courier New"
 
     # Grab share template and inject version
-    echo "1552061114 proton-tkg-$_protontkg_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
+    _versionpre=`date '+%s'`
+    echo $_versionpre "proton-tkg-$_protontkg_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
 
     # Create the dxvk dirs
     mkdir -p "$_nowhere/proton_dist_tmp/lib64/wine/dxvk"
@@ -482,14 +485,17 @@ else
     # Build steam helper
     build_steamhelper
 
-    # Inject vkd3d libs in our wine-tkg-git build
+    # vkd3d
+    # Build vkd3d-proton when vkd3dlib is disabled - Requires MinGW-w64-gcc or it won't be built
+    if [ "$_use_vkd3dlib" = "false" ]; then
+      _build_vkd3d="true"
+    fi
     if [ "$_build_vkd3d" = "true" ]; then
-      for f in "$_nowhere"/vkd3d-fork-build/build/lib64-vkd3d/out/lib/libvkd3d*so*; do
-        strip "$f" && cp -v "$f" proton_dist_tmp/lib64/
-      done
-      for f in "$_nowhere"/vkd3d-fork-build/build/lib32-vkd3d/out/lib/libvkd3d*so*; do
-        strip "$f" && cp -v "$f" proton_dist_tmp/lib/
-      done
+      build_vkd3d
+      mkdir -p proton_dist_tmp/lib64/wine/vkd3d-proton
+      mkdir -p proton_dist_tmp/lib/wine/vkd3d-proton
+      cp -v "$_nowhere"/vkd3d-proton/build/lib64-vkd3d/bin/* proton_dist_tmp/lib64/wine/vkd3d-proton/
+      cp -v "$_nowhere"/vkd3d-proton/build/lib32-vkd3d/bin/* proton_dist_tmp/lib/wine/vkd3d-proton/
     fi
 
     # dxvk
@@ -549,7 +555,7 @@ else
     cd "$_nowhere" && rm -rf proton_dist_tmp
 
     # Grab conf template and inject version
-    echo "1552061114 proton-tkg-$_protontkg_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
+    echo $_versionpre "proton-tkg-$_protontkg_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
 
     # Patch our proton script to use the current proton tree prefix version value
     _prefix_version=$(cat "$_nowhere/Proton/proton" | grep "CURRENT_PREFIX_VERSION=")
