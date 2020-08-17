@@ -14853,7 +14853,7 @@ index 8ba571f3..920c93bc 100755
 -	) >> "$patchlist"
 -fi
 -
- # Patchset mmsystem.dll16-MIDIHDR_Refcount
+ # Patchset mfplat-streaming-support
  # |
  # | This patchset fixes the following Wine bugs:
 @@ -3260,7 +3908,7 @@ fi

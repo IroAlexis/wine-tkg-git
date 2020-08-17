@@ -292,7 +292,7 @@ user_patcher() {
 	    printf '%s\n' "${_patches[@]}"
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
-	  if [ "$_CONDITION" = "y" ] || [ "$_user_patches_no_confirm" = "true" ]; then
+	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
 	    for _f in "${_patches[@]}"; do
 	      if [ -e "${_f}" ]; then
 	        msg2 "######################################################"
@@ -317,7 +317,7 @@ user_patcher() {
 	    printf '%s\n' "${_patches[@]}"
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
-	  if [ "$_CONDITION" = "y" ] || [ "$_user_patches_no_confirm" = "true" ]; then
+	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
 	    for _f in "${_patches[@]}"; do
 	      if [ -e "${_f}" ]; then
 	        msg2 "######################################################"
@@ -514,6 +514,7 @@ _prepare() {
 	# Hotfixer
 	if [ "$_LOCAL_PRESET" != "staging" ] && [ "$_LOCAL_PRESET" != "mainline" ]; then
 	  source "$_where"/wine-tkg-patches/hotfixes/hotfixer
+	  msg2 "Hotfixing..."
 	  for _commit in ${_hotfix_mainlinereverts[@]}; do
 	    cd "${srcdir}"/"${_winesrcdir}"
 	    _committorevert=$_commit _hotfixmsg="(hotfix)" nonuser_reverter
@@ -560,6 +561,7 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then #todo - backports
+	    _committorevert=440fab3870b3c9ea778031ec51db69f8c3a687f5 && nonuser_reverter
 	    _committorevert=b45c04f4c352ef81df5312684008839f4eeee03d && nonuser_reverter
 	    _committorevert=9c99d9bceba34559a32f1e5906a6fcbcf91b0004 && nonuser_reverter
 	    _committorevert=2116b49717f26802b51e2904de8d74651da33545 && nonuser_reverter
@@ -638,8 +640,10 @@ _prepare() {
 	if [ "$_update_winevulkan" = "true" ] && ! git merge-base --is-ancestor 3e4189e3ada939ff3873c6d76b17fb4b858330a8 HEAD && git merge-base --is-ancestor eb39d3dbcac7a8d9c17211ab358cda4b7e07708a HEAD; then
 	  _patchname='winevulkan-1.1.103.patch' && _patchmsg="Applied winevulkan 1.1.103 patch" && nonuser_patcher
 	fi
-	if ( [ "$_update_winevulkan" = "true" ] || [ "$_proton_fs_hack" = "true" ] ) && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor df2fd22e4de96b28eb0ced5e8aa9bf4c421b5ed8 HEAD ) && ( [ "$_hotfixansw" != "N" ] && [ "$_hotfixansw" != "n" ] ) || ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor 23ae4e6c7ac3b4c463ea79944dac62affe6173bf HEAD ); then
-	  _staging_args+=(-W winevulkan-vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+	if ( [ "$_update_winevulkan" = "true" ] || [ "$_proton_fs_hack" = "true" ] ); then
+	  if [ -d "${srcdir}"/"${_stgsrcdir}"/patches/winevulkan-vkGetPhysicalDeviceSurfaceCapabilitiesKHR ]; then # ghetto check for winevulkan-vkGetPhysicalDeviceSurfaceCapabilitiesKHR staging patchset presence
+	    _staging_args+=(-W winevulkan-vkGetPhysicalDeviceSurfaceCapabilitiesKHR)
+	  fi
 	fi
 
 	# use CLOCK_MONOTONIC instead of CLOCK_MONOTONIC_RAW in ntdll/server - lowers overhead
@@ -889,7 +893,7 @@ _prepare() {
 
 	_commitmsg="02-pre-staging" _committer
 
-	if [ "$_use_staging" = "true" ] && [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW2" = "y" ]; then
+	if [ "$_use_staging" = "true" ] && [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW2" =~ [yY] ]]; then
 	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args[@]}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
 	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}" >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
 
@@ -1151,8 +1155,10 @@ _prepare() {
 
 	# Fix for Mortal Kombat 11 - Requires staging, native mfplat (win7) and a different GPU driver than RADV
 	if [ "$_mk11_fix" = "true" ] && [ "$_use_staging" = "true" ]; then
-	  if git merge-base --is-ancestor 84d85adeea578cac37bded97984409f44c7985ba HEAD; then
+	  if git merge-base --is-ancestor 75fb68e42423362ae945c0c0554f0dcd4d2e169b HEAD; then
 	    _patchname='mk11.patch' && _patchmsg="Applied Mortal Kombat 11 fix" && nonuser_patcher
+	  elif git merge-base --is-ancestor 84d85adeea578cac37bded97984409f44c7985ba HEAD; then
+	    _patchname='mk11-75fb68e.patch' && _patchmsg="Applied Mortal Kombat 11 fix" && nonuser_patcher
 	  elif git merge-base --is-ancestor 2ea3e40465f0530ad71c31e77c9727c00673d91f HEAD; then
 	    _patchname='mk11-84d85ad.patch' && _patchmsg="Applied Mortal Kombat 11 fix" && nonuser_patcher
 	  elif git merge-base --is-ancestor fb7cc99f8a8c5a1594cfa780807d5e75f4b9539e HEAD; then
@@ -2017,7 +2023,8 @@ _polish() {
 	      _version_tags+=(Vkd3d)
 	    fi
 	  fi
-	  sed -i "s/\\\1/\\\1  ( ${_version_tags[*]} )/g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
+	  sed -i "s/\"\\\1.*\"/\"\\\1  ( ${_version_tags[*]} )\"/g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
+	  sed -i "s/\"\\\1.*\"/\"\\\1  ( ${_version_tags[*]} )\"/g" "${srcdir}"/"${_winesrcdir}"/dlls/ntdll/Makefile.in
 	fi
 
 	# fix path of opencl headers
