@@ -19,6 +19,7 @@ if [[ ${_community_patches[*]} =~ "guy1524_mfplat_WIP.mypatch" ]]; then
   if ( [ "$_hotfixansw" != "n" ] && [ "$_hotfixansw" != "N" ] ) || [ "$_hotfixes_no_confirm" = "true" ]; then
     _proton_mf_hacks="false"
   fi
+  _staging_args+=(-W mfplat-streaming-support)
 fi
 # /community patches
 
@@ -44,6 +45,22 @@ fi
 if ( cd "${srcdir}"/"${_stgsrcdir}" && [ "$(git rev-parse HEAD)" = "4ef21bcf82f625cce4c487c34ab695e61388afb6" ] ); then
   warning "Disable broken dsound-EAX patchset on staging 4ef21bcf"
   _staging_args+=(-W dsound-EAX)
+fi
+
+# Broken staging eae4093b
+if ( cd "${srcdir}"/"${_stgsrcdir}" && [ "$(git rev-parse HEAD)" = "eae4093bf85769871ce6675b54364d190094ebd3" ] ); then
+  warning "Fix typo in mfplat-streaming-support patchset on staging eae4093b"
+  patch "${srcdir}"/"${_stgsrcdir}"/patches/mfplat-streaming-support/0035-Miscellaneous.patch << 'EOM'
+@@ -1269,7 +1269,7 @@ index 0000000000..d6d6b01a11
+ +
+ +    drain = gst_query_new_drain();
+ +    gst_pad_peer_query(decoder->input_src, drain);
+-+    gst_query_unref (query);
+++    gst_query_unref(drain);
+ +
+ +    if (decoder->output_counter || decoder->draining)
+ +    {
+EOM
 fi
 
 # Broken staging d9eb78e5 - 03290f8a

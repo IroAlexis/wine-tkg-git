@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.15.2.r2.g68c50a8f
+pkgver=5.15.2.r12.gc4b73e17
 pkgrel=1
 _frogwhere="$PWD"
 export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
@@ -63,8 +63,8 @@ makedepends=(
     'meson'                 'ninja'
     'glslang'               'wget'
     'ocl-icd'               'lib32-ocl-icd'
-    'vkd3d'                 'lib32-vkd3d'
-    'opencl-headers'        $_user_makedeps
+    'opencl-headers'        'mingw-w64-gcc'
+    $_user_makedeps
 )
 optdepends=(
     'giflib'                'lib32-giflib'
@@ -89,7 +89,6 @@ optdepends=(
     'cups'                  'zapcc'
     'samba'                 'clang'
     'dosbox'                'ccache'
-    'mingw-w64-gcc'
 )
 
 exit_cleanup() {
@@ -164,23 +163,12 @@ pkgver() {
 
 prepare() {
   cd ${_frogwhere}
-  mkdir -p Proton
-  mkdir -p vkd3d-proton
-  mkdir -p liberation-fonts
-  mkdir -p dxvk
-  mkdir -p mono
-  mkdir -p gecko
-  ln -s -f "${_frogwhere}/Proton" "${srcdir}/"
-  ln -s -f "${_frogwhere}/vkd3d-proton" "${srcdir}/"
-  ln -s -f "${_frogwhere}/liberation-fonts" "${srcdir}/"
-  ln -s -f "${_frogwhere}/dxvk" "${srcdir}/"
+  ln -s -f "${_frogwhere}/external-ressources" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton_template" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg.cfg" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg.sh" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg-userpatches" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg-profiles" "${srcdir}/"
-  ln -s -f "${_frogwhere}/mono" "${srcdir}/"
-  ln -s -f "${_frogwhere}/gecko" "${srcdir}/"
 }
 
 build() {

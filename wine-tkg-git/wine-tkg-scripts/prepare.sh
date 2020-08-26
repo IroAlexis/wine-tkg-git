@@ -6,12 +6,14 @@ _exit_cleanup() {
     if [ -n "$_PROTON_NAME_ADDON" ]; then
       if [ "$_ispkgbuild" = "true" ]; then
         echo "_protontkg_version=makepkg.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_true_version=${pkgver}.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
       else
         echo "_protontkg_version=${pkgver}.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
       fi
     else
       if [ "$_ispkgbuild" = "true" ]; then
         echo "_protontkg_version=makepkg" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_true_version=${pkgver}" >> "$_proton_tkg_path"/proton_tkg_token
       else
         echo "_protontkg_version=${pkgver}" >> "$_proton_tkg_path"/proton_tkg_token
       fi
@@ -479,6 +481,9 @@ _prepare() {
 	if [ "$_use_vkd3dlib" = "mainline" ] || [ "$_use_vkd3dlib" = "fork" ]; then
 	  _configure_args+=(--with-vkd3d)
 	  echo "Using VKD3D for d3d12 translation" >> "$_where"/last_build_config.log
+	elif [ -e "$_proton_tkg_path"/proton_tkg_token ] && [ -n "$_proton_tkg_path" ]; then
+	  _configure_args+=(--without-vkd3d)
+	  echo "Using vkd3d-proton standalone for d3d12 translation" >> "$_where"/last_build_config.log
 	else
 	  _configure_args+=(--without-vkd3d)
 	  echo "NOT using VKD3D for d3d12 translation" >> "$_where"/last_build_config.log
@@ -561,6 +566,7 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then #todo - backports
+	    _committorevert=2b484b1ac7a5510be54cb5341143d89dc1924b37 && nonuser_reverter
 	    _committorevert=440fab3870b3c9ea778031ec51db69f8c3a687f5 && nonuser_reverter
 	    _committorevert=b45c04f4c352ef81df5312684008839f4eeee03d && nonuser_reverter
 	    _committorevert=9c99d9bceba34559a32f1e5906a6fcbcf91b0004 && nonuser_reverter
@@ -611,6 +617,11 @@ _prepare() {
 	  _committorevert=e5354008f46bc0e345c06ac06a7a7780faa9398b && nonuser_reverter
 	  _committorevert=461b5e56f95eb095d97e4af1cb1c5fd64bb2862a && nonuser_reverter
 	  echo -e "( Kernelbase reverts clean reverts applied )\n" >> "$_where"/last_build_config.log
+	fi
+
+	# Don't include *.orig and *~ files in the generated staging patchsets
+	if [ "$_generate_patchsets" != "false" ] && [ "$_use_staging" = "true" ]; then
+	  echo -e "*.orig\n*~" >> "${srcdir}"/"${_stgsrcdir}"/.gitignore
 	fi
 
 	_commitmsg="01-reverts" _committer
@@ -1771,6 +1782,12 @@ EOM
 	  fi
 	  if [ "$_staging_pulse_disable" != "true" ] && [ "$_use_staging" = "true" ]; then
 	    _patchname='proton-pa-staging.patch' && _patchmsg="Enable Proton's PA additions" && nonuser_patcher
+	  fi
+	  # Legacy wine.gaming.input patchset (Death Stranding)
+	  if git merge-base --is-ancestor 1ec8bf9b739f1528b742169670eac2350b33a7d4 HEAD; then
+	    if [ "$_use_staging" = "false" ] || ( [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor c4b73e1752354f1759cc8b1cad39e1931dd85a51 HEAD ) ); then
+	      _patchname='proton-windows.gaming.input.patch' && _patchmsg="Enable Proton's legacy wine.gaming.input patchset for Death Stranding" && nonuser_patcher
+	    fi
 	  fi
 	fi
 
