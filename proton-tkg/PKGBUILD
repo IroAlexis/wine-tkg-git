@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.15.2.r12.gc4b73e17
+pkgver=5.16.r2.gf6495b29
 pkgrel=1
 _frogwhere="$PWD"
 export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
@@ -162,7 +162,10 @@ pkgver() {
 }
 
 prepare() {
-  cd ${_frogwhere}
+  cd "${_frogwhere}"
+  if [ ! -d "${_frogwhere}/external-ressources" ]; then
+    mkdir -p "${_frogwhere}/external-ressources"
+  fi
   ln -s -f "${_frogwhere}/external-ressources" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton_template" "${srcdir}/"
   ln -s -f "${_frogwhere}/proton-tkg.cfg" "${srcdir}/"
@@ -185,7 +188,7 @@ package() {
   rm -f proton_tkg_token
 
   recursive_installer proton_tkg_* "${pkgdir}/usr/share/steam/compatibilitytools.d"
-  cd ${pkgdir}/usr/share/steam/compatibilitytools.d/proton_tkg_*
+  cd "${pkgdir}"/usr/share/steam/compatibilitytools.d/proton_tkg_*
 
   mkdir -p tmpdist
   mkdir -p dist

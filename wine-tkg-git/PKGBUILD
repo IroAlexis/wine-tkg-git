@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play-git
-pkgver=5.15.2.r12.gc4b73e17
+pkgver=5.16.r2.gf6495b29
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
@@ -862,7 +862,9 @@ else
     "wine-esync=$pkgver"
   )
   conflicts=('wine' 'wine-wow64' 'wine-staging' 'wine-esync')
-  replaces=("${pkgname/%-git/-faudio-git}")
+  if [[ "$pkgname" == *-git ]]; then
+    replaces=("${pkgname/%-git/-faudio-git}")
+  fi
 fi
 
 if [ -n "$_localbuild" ]; then
