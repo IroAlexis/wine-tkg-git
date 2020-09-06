@@ -295,7 +295,7 @@ user_patcher() {
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
 	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        msg2 "######################################################"
 	        msg2 ""
@@ -320,7 +320,7 @@ user_patcher() {
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
 	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        msg2 "######################################################"
 	        msg2 ""
@@ -399,7 +399,7 @@ _prepare() {
 	  fi
 	  _community_patches=($_community_patches)
 	  for _p in ${_community_patches[@]}; do
-	    ln -s "$_where"/../../community-patches/wine-tkg-git/$_p "$_where"/
+	    ln -s "$_where"/../../community-patches/wine-tkg-git/"$_p" "$_where"/
 	  done
 	fi
 
@@ -456,7 +456,7 @@ _prepare() {
 	    fi
 	  fi
 	  echo "Using esync patchset (version ${_esync_version})" >> "$_where"/last_build_config.log
-	  wget -O "$_where"/esync${_esync_version}.tgz https://github.com/zfigura/wine/releases/download/esync${_esync_version}/esync.tgz && tar zxf "$_where"/esync${_esync_version}.tgz -C "${srcdir}"
+	  wget -O "$_where"/esync"${_esync_version}".tgz https://github.com/zfigura/wine/releases/download/esync"${_esync_version}"/esync.tgz && tar zxf "$_where"/esync"${_esync_version}".tgz -C "${srcdir}"
 	fi
 
 	if [ "$_use_pba" = "true" ]; then
@@ -566,6 +566,7 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then #todo - backports
+	    _committorevert=586f68f414924b1e41fec10a72b1aacced068885 && nonuser_reverter
 	    _committorevert=d9625e5a01a52496d1fb7f1a9a691fd3ec8332db && nonuser_reverter
 	    _committorevert=715a04daabdab616b530ef5a937827df7c2523c3 && nonuser_reverter
 	    _committorevert=f04360cfbec574dc37675df141ef8fc14e1302ba && nonuser_reverter
@@ -1186,7 +1187,7 @@ _prepare() {
 	  else
 	    if [ "$_large_address_aware" = "true" ]; then
 	      for _f in "$_where"/LAA-stagin*.patch ; do
-	        patch ${_f} << 'EOM'
+	        patch "${_f}" << 'EOM'
 @@ -220,15 +220,16 @@ diff --git a/dlls/ntdll/virtual.c b/dlls/ntdll/virtual.c
  index c008db78066..6163761a466 100644
  --- a/dlls/ntdll/virtual.c
@@ -1313,7 +1314,7 @@ EOM
 	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 938dddf7df920396ac3b30a44768c1582d0c144f HEAD ); then
 	  echo -e "\nLegacy Proton Fullscreen inline patching" >> "$_where"/prepare.log
 	  for _f in "$_where"/valve_proton_fullscreen_hack-staging-{938dddf,de64501,82c6ec3,7cc69d7,0cb79db,a4b9460,57bb5cc,6e87235}.patch; do
-	    patch ${_f} >> "$_where"/prepare.log << 'EOM'
+	    patch "${_f}" >> "$_where"/prepare.log << 'EOM'
 @@ -2577,7 +2577,7 @@ index 1209a250b0..077c18ac10 100644
  +    input.u.mi.dx = pt.x;
  +    input.u.mi.dy = pt.y;
@@ -1929,11 +1930,17 @@ EOM
 
 	# Set the default wine version to win10
 	if [ "$_win10_default" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD; then
-	  if git merge-base --is-ancestor e13d54665765d9dd8829233f0ea748fd685a1913 HEAD; then
+	  if git merge-base --is-ancestor 87f41e6b408dd01055ff6a378b90d089d61ec370 HEAD; then
 	    if [ "$_use_staging" = "true" ]; then
 	      _patchname='proton-win10-default-staging.patch' && _patchmsg="Enforce win10 as default wine version (staging)" && nonuser_patcher
 	    else
 	      _patchname='proton-win10-default.patch' && _patchmsg="Enforce win10 as default wine version" && nonuser_patcher
+	    fi
+	  elif git merge-base --is-ancestor e13d54665765d9dd8829233f0ea748fd685a1913 HEAD; then
+	    if [ "$_use_staging" = "true" ]; then
+	      _patchname='proton-win10-default-staging-87f41e6.patch' && _patchmsg="Enforce win10 as default wine version (staging)" && nonuser_patcher
+	    else
+	      _patchname='proton-win10-default-87f41e6.patch' && _patchmsg="Enforce win10 as default wine version" && nonuser_patcher
 	    fi
 	  else
 	    _patchname='proton-win10-default-e13d546.patch' && _patchmsg="Enforce win10 as default wine version" && nonuser_patcher
@@ -1955,7 +1962,7 @@ EOM
 	fi
 
 	# Proton-tkg needs to know if standard dlopen() is in use
-	if git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD; then
+	if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD ); then
 	  _standard_dlopen="true"
 	else
 	  _standard_dlopen="false"

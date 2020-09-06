@@ -87,6 +87,7 @@ EOF
 
 function build_vrclient {
   cd "$_nowhere"/Proton
+  source "$_nowhere/proton_tkg_token"
   git clone https://github.com/ValveSoftware/openvr.git || true # It'll complain the path already exists on subsequent builds
   cd openvr
   git reset --hard HEAD
@@ -134,6 +135,7 @@ function build_vrclient {
 
 function build_lsteamclient {
   cd "$_nowhere"/Proton
+  source "$_nowhere/proton_tkg_token"
   export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --nomsvcrt --dll -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/ -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
   export CFLAGS="-O2 -g"
   export CXXFLAGS="-fpermissive -Wno-attributes -O2 -g"
@@ -171,6 +173,7 @@ function build_lsteamclient {
 
 function build_vkd3d {
   cd "$_nowhere"
+  source "$_nowhere/proton_tkg_token"
   git clone https://github.com/HansKristian-Work/vkd3d-proton.git || true # It'll complain the path already exists on subsequent builds
   cd vkd3d-proton
   git reset --hard HEAD
@@ -214,6 +217,7 @@ function build_dxvk {
 
 function build_steamhelper {
   if [[ $_proton_branch != proton_3.* ]]; then
+    source "$_nowhere/proton_tkg_token"
     rm -rf Proton/build/steam.win32
     mkdir -p Proton/build/steam.win32
     cp -a Proton/steam_helper/* Proton/build/steam.win32
@@ -244,7 +248,7 @@ proton_patcher() {
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
 	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        echo "######################################################"
 	        echo ""
@@ -258,14 +262,14 @@ proton_patcher() {
 	fi
 
 	_patches=("$_nowhere"/proton-tkg-userpatches/*."${_userpatch_ext}patch")
-	if [ ${#_patches[@]} -ge 2 ] || [ -e "${_patches}" ]; then
+	if [ "${#_patches[@]}" -ge 2 ] || [ -e "${_patches}" ]; then
 	  if [ "$_user_patches_no_confirm" != "true" ]; then
 	    echo "Found ${#_patches[@]} userpatches for ${_userpatch_target}:"
 	    printf '%s\n' "${_patches[@]}"
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
 	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        echo "######################################################"
 	        echo ""
@@ -309,7 +313,7 @@ function proton_tkg_uninstaller {
 
     steam_is_running
 
-    cp $_config_file $_config_file.bak && echo "Your config.vdf file was backed up from $_config_file (.bak)" && echo ""
+    cp "$_config_file" "$_config_file".bak && echo "Your config.vdf file was backed up from $_config_file (.bak)" && echo ""
 
     echo "What Proton-tkg build do you want to uninstall?"
 
@@ -323,7 +327,7 @@ function proton_tkg_uninstaller {
     i=1
     for build in ${_strip_builds[@]}; do
       if [ "$_to_uninstall" = "$i" ]; then
-        rm -rf "proton_tkg_$build" && _available_builds=( `ls -d proton_tkg_* | sort -V` ) && _newest_build="${_available_builds[-1]//proton_tkg_/}" && sed -i "s/\"Proton-tkg $build\"/\"Proton-tkg ${_newest_build[@]}\"/" $_config_file
+        rm -rf "proton_tkg_$build" && _available_builds=( `ls -d proton_tkg_* | sort -V` ) && _newest_build="${_available_builds[-1]//proton_tkg_/}" && sed -i "s/\"Proton-tkg $build\"/\"Proton-tkg ${_newest_build[@]}\"/" "$_config_file"
         echo "###########################################################################################################################"
         echo ""
         echo "Proton-tkg $build was uninstalled and games previously depending on it will now use Proton-tkg ${_newest_build[@]} instead."
@@ -479,7 +483,7 @@ else
     cd "$_nowhere"
 
     # Create required dirs and clean
-    if [ -z $_protontkg_true_version ]; then
+    if [ -z "$_protontkg_true_version" ]; then
       export _protontkg_true_version="$_protontkg_version"
     fi
 
@@ -525,7 +529,7 @@ else
 
     # Grab share template and inject version
     _versionpre=`date '+%s'`
-    echo $_versionpre "proton-tkg-$_protontkg_true_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
+    echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
 
     # Create the dxvk dirs
     mkdir -p "$_nowhere/proton_dist_tmp/lib64/wine/dxvk"
@@ -557,9 +561,9 @@ else
     if [ "$_use_dxvk" != "false" ]; then
       if [ "$_use_dxvk" = "git" ]; then
         build_dxvk
-      elif [ ! -d "$_nowhere"/dxvk ] || [ "$_use_dxvk" = "release" ] || [ "$_use_dxvk" = "latest" ]; then
+      elif ( [ ! -d "$_nowhere"/dxvk ] && [ ! -e "$_nowhere"/dxvk ] ) || [ "$_use_dxvk" = "release" ] || [ "$_use_dxvk" = "latest" ]; then
+        rm -rf "$_nowhere"/dxvk
         if [ "$_use_dxvk" = "latest" ]; then
-          rm -rf "$_nowhere"/dxvk
           # Download it & extract it into a temporary folder so we don't mess up the build in case proton-tkg also has/will have a folder "$_nowhere"/build (that folder is in the artifact zip)
           rm -rf "$_nowhere"/tmp-dxvk-artifact
           mkdir "$_nowhere"/tmp-dxvk-artifact
@@ -571,7 +575,6 @@ else
           cd "$_nowhere"
           rm -rf "$_nowhere"/tmp-dxvk-artifact
         else
-          rm -rf "$_nowhere"/dxvk
           download_dxvk_version
           tar -xvf dxvk-*.tar.gz >/dev/null 2>&1
           rm -f dxvk-*.tar.*
@@ -626,7 +629,7 @@ else
     cd "$_nowhere" && rm -rf proton_dist_tmp
 
     # Grab conf template and inject version
-    echo $_versionpre "proton-tkg-$_protontkg_true_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
+    echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
 
     # Patch our proton script to use the current proton tree prefix version value
     _prefix_version=$(cat "$_nowhere/Proton/proton" | grep "CURRENT_PREFIX_VERSION=")
