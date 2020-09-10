@@ -904,7 +904,11 @@ _prepare() {
 	# CSMT toggle patch - Corrects the CSMT toggle to be more logical
 	if [ "$_CSMT_toggle" = "true" ] && [ "$_use_staging" = "true" ]; then
 	  cd "${srcdir}"/"${_stgsrcdir}"
-	  _patchname='CSMT-toggle.patch' && _patchmsg="Applied CSMT toggle logic patch" && nonuser_patcher
+	  if git merge-base --is-ancestor 5e685d6df972b658fba296dafb5db189af73c7d5 HEAD; then
+	    _patchname='CSMT-toggle.patch' && _patchmsg="Applied CSMT toggle logic patch" && nonuser_patcher
+	  else
+	    _patchname='CSMT-toggle-5e685d6.patch' && _patchmsg="Applied CSMT toggle logic patch" && nonuser_patcher
+	  fi
 	  cd "${srcdir}"/"${_winesrcdir}"
 	fi
 
@@ -1986,7 +1990,7 @@ _polish() {
 
 	echo "" >> "$_where"/last_build_config.log
 
-	if [ -z "$_localbuild" ]; then
+	if [ -z "$_localbuild" ] && [ "$_untag" != "true" ]; then
 	  if [ "$_use_staging" = "true" ] && [ "$_LOCAL_PRESET" != "staging" ]; then
 	    _patchname='wine-tkg-staging.patch' && _patchmsg="Please don't report bugs about this wine build on winehq.org and use https://github.com/Frogging-Family/wine-tkg-git/issues instead." && nonuser_patcher
 	  elif [ "$_use_staging" != "true" ] && [ "$_LOCAL_PRESET" != "mainline" ]; then
