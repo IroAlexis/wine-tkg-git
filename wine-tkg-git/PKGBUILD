@@ -5,11 +5,11 @@ pkgver=5.9.r7.g8be56c21
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
-eval pkgrel=288
+eval pkgrel=298
 
 _stgsrcdir='wine-staging-git'
 _esyncsrcdir='esync'
-_where="$PWD" # track basedir as different Arch based distros are moving srcdir around
+export _where="$PWD" # track basedir as different Arch based distros are moving srcdir around
 _configure_args=() # additional args to ./configure will be added during prepare()
 _makepkg_options=()
 
@@ -24,7 +24,9 @@ exit_cleanup() {
 
 # init steps
 _init
-_pkgnaming
+if [ -z "$_localbuild" ]; then
+ _pkgnaming
+fi
 
 # custom plain wine commit to pass to git
 if [ -n "$_plain_version" ]; then
@@ -41,6 +43,11 @@ fi
 pkgdesc='This "Wine to rule them all" package is the result of some random pkgbuild found online. Looks safe to me, amirite? Some variants of it can be found in lutris runners.'
 url='https://github.com/Tk-Glitch/PKGBUILDS/tree/master/wine-tkg-git'
 arch=('x86_64')
+
+# Don't strip if _pkg_strip is disabled
+if [ "$_pkg_strip" != "true" ]; then
+ _makepkg_options+=('!strip')
+fi
 
 # Only pass the staticlibs option to system-wide installs
 if [ "$_EXTERNAL_INSTALL" != "true" ]; then
@@ -107,12 +114,18 @@ makedepends=('git' 'autoconf' 'ncurses' 'bison' 'perl' 'fontforge' 'flex'
     'meson'                 'ninja'
     'glslang'               'wget'
     'ocl-icd'               'lib32-ocl-icd'
+    $_user_makedeps
 )
 
+# mingw
+if [ -z "${CUSTOM_MINGW_PATH}" ]; then
+  makedepends+=('mingw-w64-gcc')
+fi
+
 # vkd3d deps
-if [ "$_use_vkd3d" = "mainline" ]; then
+if [ "$_use_vkd3dlib" = "mainline" ]; then
   makedepends+=('vkd3d' 'lib32-vkd3d')
-elif [ "$_use_vkd3d" = "fork" ]; then
+elif [ "$_use_vkd3dlib" = "fork" ]; then
   makedepends+=('vkd3d-fork' 'lib32-vkd3d-fork')
 fi
 
@@ -152,7 +165,7 @@ optdepends=(
     'samba'                 'clang'
     'dosbox'                'ccache'
     'faudio'                'lib32-faudio'
-    'mingw-w64-gcc'         'schedtool'
+    'schedtool'
 )
 
 # Wine source
@@ -170,7 +183,7 @@ else
 fi
 
 if [ ! -e "$_where"/BIG_UGLY_FROGMINER ]; then
-  find "$_where"/wine-tkg-patches -type f -not -path "*hotfixes*" -exec cp -n {} "$_where" \; # copy patches inside the PKGBUILD's dir to preserve makepkg sourcing and md5sum checking
+  find "$_where"/wine-tkg-patches -type f -not -path "*hotfixes*" -exec cp -n {} "$_where" \; && # copy patches inside the PKGBUILD's dir to preserve makepkg sourcing and md5sum checking
   cp "$_where"/wine-tkg-userpatches/*.my* "$_where" 2>/dev/null # copy userpatches inside the PKGBUILD's dir
 fi
 
@@ -212,9 +225,14 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'overwatch-mfstub.patch' # Overwatch mf crash workaround
 		'assettocorsa_hud_perf.patch' # Fix for Assetto Corsa performance drop when HUD elements are displayed
 		'mk11.patch' # Fix for Mortal Kombat 11
+		'mk11-75fb68e.patch' # Fix for Mortal Kombat 11 (<75fb68e)
+		'mk11-84d85ad.patch' # Fix for Mortal Kombat 11 (<84d85ad)
+		'mk11-2ea3e40.patch' # Fix for Mortal Kombat 11 (<2ea3e40)
+		'mk11-fb7cc99.patch' # Fix for Mortal Kombat 11 (<fb7cc99)
 		'mk11-78e9b02.patch' # Fix for Mortal Kombat 11 (<78e9b02)
 		'mk11-b1c748c.patch' # Fix for Mortal Kombat 11 (<b1c748c)
 		'mk11-89af635.patch' # Fix for Mortal Kombat 11 (<89af635 staging)
+		'proton-windows.gaming.input.patch' # Proton's windows.gaming.input patchset, for Death Stranding (staged as of c4b73e17)
 		# esync
 		'esync-staging-fixes-r1.patch' # For 3.10-3.16 - Untested on lower than 3.10
 		'esync-staging-fixes-r2.patch' # For 3.17+
@@ -277,6 +295,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'lowlatency_audio.patch' # wine osu! lowlat patch
 		'wine-binfmt.conf' # Enables launching windows executables directly
 		'CSMT-toggle.patch' # Corrected CSMT switch logic
+		'CSMT-toggle-5e685d6.patch' # Corrected CSMT switch logic (<5e685d6)
 		'GLSL-toggle.patch' # Toggles OpenGL shading language
 		'launch-with-dedicated-gpu-desktop-entry.patch'
 		'plasma_systray_fix.patch' # Systray fix for winex11
@@ -312,10 +331,13 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-tkg-staging-kernelbase-reverts-fd3735c.patch'
 		'staging-44d1a45-localreverts.patch' # local reverts for staging 44d1a45+fshack
 		'd3d12-fixes.patch' # Fixes for d3d12 support through vkd3d From HansKristan - https://www.winehq.org/pipermail/wine-devel/2019-October/152356.html - https://www.winehq.org/pipermail/wine-devel/2019-October/152357.html
+		'josh-flat-theme.patch' # Joshua Ashton's take on making wine dialogs and menus less win95-ish - https://github.com/Joshua-Ashton/wine/tree/wine-better-theme
 		# proton
 		'FS_bypass_compositor.patch' # Perf
 		'FS_bypass_compositor-disabler.patch' # Disabler for the actual bypass
 		'valve_proton_fullscreen_hack.patch' # Proton FS hack
+		'valve_proton_fullscreen_hack-1e074c3.patch' # Proton FS hack (<1e074c3)
+		'valve_proton_fullscreen_hack-314cd9c.patch' # Proton FS hack (<314cd9c)
 		'valve_proton_fullscreen_hack-5dd03cb.patch' # Proton FS hack (<5dd03cb)
 		'valve_proton_fullscreen_hack-408a5a8.patch' # Proton FS hack (<408a5a8)
 		'valve_proton_fullscreen_hack-3db619d.patch' # Proton FS hack (<3db619d)
@@ -325,6 +347,8 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'valve_proton_fullscreen_hack-086c686.patch' # Proton FS hack (<086c686)
 		'valve_proton_fullscreen_hack-74dc0c5.patch' # Proton FS hack (<74dc0c5)
 		'valve_proton_fullscreen_hack-staging.patch' # Proton FS hack (staging)
+		'valve_proton_fullscreen_hack-staging-1e074c3.patch' # Proton FS hack (<1e074c3) (staging)
+		'valve_proton_fullscreen_hack-staging-314cd9c.patch' # Proton FS hack (<314cd9c) (staging)
 		'valve_proton_fullscreen_hack-staging-5dd03cb.patch' # Proton FS hack (<5dd03cb) (staging)
 		'valve_proton_fullscreen_hack-staging-408a5a8.patch' # Proton FS hack (<408a5a8) (staging)
 		'valve_proton_fullscreen_hack-staging-3db619d.patch' # Proton FS hack (<3db619d) (staging)
@@ -382,6 +406,12 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-tkg-2633a5c.patch' # Proton-tkg (<2633a5c)
 		'proton-tkg-a302ab4.patch' # Proton-tkg (<a302ab4)
 		'proton-tkg-0556d9e.patch' # Proton-tkg (<0556d9e)
+		'proton-tkg-8898a69.patch' # Proton-tkg (<8898a69)
+		'proton-tkg-d93137e.patch' # Proton-tkg (<d93137e)
+		'proton-tkg-d806203.patch' # Proton-tkg (<d806203)
+		'proton-tkg-d17b118.patch' # Proton-tkg (<d17b118)
+		'proton-tkg-7d67c41.patch' # Proton-tkg (<7d67c41)
+		'proton-tkg-1ec8bf9.patch' # Proton-tkg (<1ec8bf9)
 		'proton-tkg.patch' # Proton-tkg
 		'proton-tkg-rpc.patch' # necessary pre-patch for Proton-tkg
 		'proton-tkg-staging-8d25965.patch' # Proton-tkg-staging (<8d25965)
@@ -412,6 +442,12 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-tkg-staging-2633a5c.patch' # Proton-tkg-staging (<2633a5c)
 		'proton-tkg-staging-a302ab4.patch' # Proton-tkg-staging (<a302ab4)
 		'proton-tkg-staging-0556d9e.patch' # Proton-tkg-staging (<0556d9e)
+		'proton-tkg-staging-8898a69.patch' # Proton-tkg-staging (<0556d9e)
+		'proton-tkg-staging-d93137e.patch' # Proton-tkg-staging (<d93137e)
+		'proton-tkg-staging-d806203.patch' # Proton-tkg-staging (<d806203)
+		'proton-tkg-staging-d17b118.patch' # Proton-tkg-staging (<d17b118)
+		'proton-tkg-staging-7d67c41.patch' # Proton-tkg-staging (<7d67c41)
+		'proton-tkg-staging-1ec8bf9.patch' # Proton-tkg-staging (<1ec8bf9)
 		'proton-tkg-staging.patch' # Proton-tkg-staging
 		'proton-tkg-staging-rpc.patch' # necessary pre-patch for Proton-tkg-staging
 		'proton-tkg-steamclient-swap.patch' # Key steamclient substitution hack
@@ -437,6 +473,7 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-gamepad-additions-6cb3d0f.patch' # Proton 4.11-7 xinput hacks and other gamepad additions (<6cb3d0f)
 		'proton-gamepad-additions.patch' # Proton 4.11-7 xinput hacks and other gamepad additions
 		'proton-vk-bits-4.5.patch' # Proton vk bits for 4.5+
+		'proton-vk-bits-4.5-1e074c3.patch' # Proton vk bits for 4.5+ (<1e074c3)
 		'proton-vk-bits-4.5-408a5a8.patch' # Proton vk bits for 4.5+ (<408a5a8)
 		'proton-restore-unicode.patch' # Restore installing wine/unicode.h to please Proton
 		'proton_mf_hacks-7c5fcff.patch' # Workarounds to prevent crashes on some mf functions (<7c5fcff)
@@ -449,7 +486,10 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-vr.patch' # wined3d interop and friends for steamvr support
 		'proton-vr-a6d74b.patch' # wined3d interop and friends for steamvr support (<a6d74b)
 		'proton-vr-c736321.patch' # wined3d interop and friends for steamvr support (<c736321)
+		'proton-win10-default-staging.patch' # Set default wine version to win10 - staging
+		'proton-win10-default-staging-87f41e6.patch' # Set default wine version to win10 - staging (<87f41e6)
 		'proton-win10-default.patch' # Set default wine version to win10
+		'proton-win10-default-87f41e6.patch' # Set default wine version to win10 (<87f41e6)
 		'proton-win10-default-e13d546.patch' # Set default wine version to win10 (<e13d546)
 		'proton-steam-bits.patch' # Proton's steam-centric patches
 		'proton-steam-bits-9122bc1.patch' # Proton's steam-centric patches (<9122bc1)
@@ -464,6 +504,9 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-winevulkan-594814c.patch' # Winevulkan-specific patches (<594814c)
 		'proton-winevulkan-d2f552d.patch' # Winevulkan-specific patches (<d2f552d)
 		'proton-winevulkan-408a5a8.patch' # Winevulkan-specific patches (<408a5a8)
+		'proton-winevulkan-380b7f2.patch' # Winevulkan-specific patches (<380b7f2)
+		'proton-winevulkan-8bd6223.patch' # Winevulkan-specific patches (<8bd6223)
+		'proton-winevulkan-1e074c3.patch' # Winevulkan-specific patches (<1e074c3)
 		'proton-winevulkan.patch' # Winevulkan-specific patches
 		'proton-winevulkan-nofshack-7b1622d.patch' # Winevulkan-specific patches - for FS hack disabled (<7b1622d)
 		'proton-winevulkan-nofshack-bdeae71.patch' # Winevulkan-specific patches - for FS hack disabled (<bdeae71)
@@ -471,6 +514,9 @@ source=("$_winesrcdir"::"${_winesrctarget}${_plain_commit}"
 		'proton-winevulkan-nofshack-594814c.patch' # Winevulkan-specific patches - for FS hack disabled (<594814c)
 		'proton-winevulkan-nofshack-d2f552d.patch' # Winevulkan-specific patches - for FS hack disabled (<d2f552d)
 		'proton-winevulkan-nofshack-408a5a8.patch' # Winevulkan-specific patches - for FS hack disabled (<408a5a8)
+		'proton-winevulkan-nofshack-380b7f2.patch' # Winevulkan-specific patches - for FS hack disabled (<380b7f2)
+		'proton-winevulkan-nofshack-8bd6223.patch' # Winevulkan-specific patches - for FS hack disabled (<8bd6223)
+		'proton-winevulkan-nofshack-1e074c3.patch' # Winevulkan-specific patches - for FS hack disabled (<1e074c3)
 		'proton-winevulkan-nofshack.patch' # Winevulkan-specific patches - for FS hack disabled
 		'proton-seccomp-envvar.patch' # Guard seccomp with the WINESECCOMP envvar - Depends on staging
 		'proton-seccomp-envvar-805f2e9.patch' # Guard seccomp with the WINESECCOMP envvar - Depends on staging (<805f2e9)
@@ -514,10 +560,15 @@ md5sums=('SKIP'
          '37c1daa7dc989412e5ced603f91ef3d0'
          'cf308e18ad3724e4872280ec35e25338'
          '8a6d9ad92d3becae6bd9dbb05d7d6f48'
+         '4b2197a7d99ae1eaf638724b186dc2bd'
+         '48b801c6206c85feeaae10be99ec102c'
+         'd1788bb2a24f71fde4ba65f2cd6b6827'
+         '5aa538906e7c77e0dddfa8419d5e60af'
          'fe6fb8fc31fa9b2873c16775508008ab'
          'df51fc676f048a4ee04c4c74bb154a76'
          '358699ebb023e95c72249893276f0535'
          'dbaec8420ff91dcff94f9a4f32dae6e1'
+         '6f64639625363288f3022824181dc695'
          'dd993e03188c86631e6c2cbdf14113aa'
          'b997bf4bae2d08f7e84870c8c91fb08b'
          '374ffc1d29488dd3fdac7d01f55964d4'
@@ -575,6 +626,7 @@ md5sums=('SKIP'
          'd2e54ed8d69b808c26065e643b2244bb'
          'ed6060dc030ebd5865f1fcc40d8863be'
          'cff441678d798466a13a0d03b01e23d7'
+         'ccdb3f73cc5be5fe9ac0207a164b34bc'
          '830a78ea35e124536cdbc8291102ffaa'
          '65d47ea14d7c666d6308fc65a5ccd729'
          '3aafb27f35d4817942085d87904dcfc8'
@@ -611,8 +663,11 @@ md5sums=('SKIP'
          '45c4ddc0b4c8e1dac0a7f5b35b683aa0'
          'd3340a177d39c949634fbc8af6c98eda'
          '2156fa1d317ac7179d36ac179bbb9049'
+         '478291af019016371b731b8f6a997b1b'
          '5ca4ee142eafe2c8873d59b2feb51a7d'
          '684d1c60aa38a659b1dd792b1d7cd8f5'
+         '8b0187cf4a1fd50ed3b20bbae4b24bda'
+         'd7656e4e5451ad167f10a32542053582'
          '80e47bafec873c246b554e9cf002ac58'
          'b48f9455c1c5a6e4326bb4cbaefde608'
          '1848dc7dd2ce2c6acb3c5ba9f0890ab6'
@@ -622,6 +677,8 @@ md5sums=('SKIP'
          '7793838191ccf67fee6802d5fc8c0be1'
          'e1139317e531f6cfe3633d441bd3eb18'
          '088561d2f36294b7734c315d03f842b3'
+         '6a9616b19a8615b4045aa07632b2563a'
+         '2fe51b9ad18d1df6ca1a012b449fc055'
          '6923edb9441ec6afc13c494e1160d54a'
          '1b66ffe62af8c85f9535fbf00c807234'
          '7a362fbd27780120ca6a5b7a3b052666'
@@ -643,7 +700,7 @@ md5sums=('SKIP'
          '962fa3a5a4c5fd57b9f4715ed587fbe6'
          '4df9cd990a78606d3cd0dc0673bb141f'
          'a784c182c65c20cbb29b6473abae171d'
-         '713c5efbfb8a8d63369d99e21c18e41f'
+         'f2db9103d6527377746540a9f8860c2f'
          'e674e7ba323b3f68acfefd3831f32773'
          '8dd4c3d330bcad3faed683aa01eb34b5'
          '875f689721d7aacea801698894804690'
@@ -681,6 +738,12 @@ md5sums=('SKIP'
          'e9e1b9bf28bbb7b4d5c9e9539c91dc23'
          '1155b05ff2c1217f128b4260e3b98271'
          '5b751ab740daacafb12eac774ce4491d'
+         '5b751ab740daacafb12eac774ce4491d'
+         '9fecb4f604880d00dcea9280a1c04f95'
+         '18322872250289e19e9800037c37a0cf'
+         '32d15a049aa5bcb9081293a2a49f42fd'
+         '4dc14ee63d91ff6312bd887efaee50d0'
+         'a3cedb4295c7d066edd3ac8fe77d14d4'
          '7d9a7cf523c7283c64266148707b8bac'
          'fbc02256e0e85668be75e0275637d6c1'
          '4aa05580e78d36fdbd80f2ef2f46a6b3'
@@ -708,9 +771,15 @@ md5sums=('SKIP'
          'e9119e3f4032dfb217149492e8dd3587'
          'a560dac3c8405e28758c525adf99f14d'
          'b32acd9b9185a5b5fbdd59bbeaee43a0'
-         '292dcc842c0c959e3d18bc5b28ab2df6'
+         '649ee9dcf1eb21eaa2d978501fb88975'
          'd602e227beb797a74e2e8c8a7867039a'
          'acd4e005f63f9563cbc9ab43aba3c6d7'
+         '4719749af95d53f30a7391fc4ef2bd77'
+         '5a2c50b18eced71c0e86b30a1c9855d3'
+         '8320e9a3622ea53060c4d066760723e5'
+         '08c0f64e6f86c49a30df2d81efcb21ff'
+         'ce37e315597e923f0ab3025a17d6b2ba'
+         '8e0c98b995ee2038cba67abb956350e4'
          'f404adafc8648495270e01241cd0601e'
          '0e5867170648e00bf2d41d415579cdd3'
          '8681c98f6d488957a206c9c1f2f9547f'
@@ -733,7 +802,8 @@ md5sums=('SKIP'
          'dbfbe90139f3df928df6e96f1759d7e8'
          '46c9db3524f858fcc8a8844a0294fc96'
          'b9d02985f9fcdc601b7d5fbf4941d9d4'
-         '86567c32e34631f4b9a872538862eca2'
+         '3ac0f9d110f954cda629ccda21b95ed8'
+         'b4a6fd86caa3b7a0c930f4d9b402e7cb'
          '27d948a8466b592a12336e9e4b02afed'
          '3a4e77d80bc2d645266bed6979dc0da9'
          'eea40375be4cd3615eaef5412802274b'
@@ -747,7 +817,10 @@ md5sums=('SKIP'
          '64dde324c635e4b4cdc271fe11de627b'
          '5a4baa27b177b888762555c770b21f1a'
          '64dde324c635e4b4cdc271fe11de627b'
-         '5fa8262cf09764300313cb119cb5afef'
+         '14b25e49b98dcb5b529029b0620efd3b'
+         'ba9f80192841c7e24c8957240c56b48c'
+         'd513173b31d79ae89064e6c121f41811'
+         '55836ec9518abd313dce7f24805deed6'
          '045aad3b7247f4ce632f6512ebfeb527'
          'f9b6454578d8323b1e1a7e896cc4a961'
          '4cb7a74ca0d275fcaaae8f58d0a55d5e'
@@ -762,7 +835,10 @@ md5sums=('SKIP'
          'd0df11c800e327314de345e815b41a6d'
          '863a40ba1ce2c66d3a7230df0ff71a09'
          '668b0ddb6fa5b9ea2e709a7cd8c178dd'
-         'd4a8f77dc167c8adb2180a2cff5c605c'
+         '3aa6b2a30677a186b472b6fdf756f005'
+         'c037c8ade0f294effe0095065f5f1bc2'
+         '7e9d05a1f7a9783fac07b949185335ad'
+         '49ccebf37c6538c78d34a1f3f1e5c7e1'
          'dfda79f2fc402d976c35c979aa3da221'
          'b3b4a54457186f85b9471dbb44f0628d'
          '1a974db3a62100e6af91b0fb95412554'
@@ -770,6 +846,9 @@ md5sums=('SKIP'
          'a7e78904f0919da69a8ad7081e7d9df0'
          '746169aa35911b8dd58d0554f8236806'
          'bafb3b8e96a9ef36f31b4807e71e63b4'
+         '4e354c982e78d71dcf287c2b3463d62d'
+         '097895cb8d61d186ecbfb4eefd8f9174'
+         'c4eb5dfca66660ac153f34d7758f89ee'
          '853baac75d041f8b1c4f3543b5ee47dd'
          'c803ecfa7b27620ff0166598241e4fd2'
          '878a27a4b7928e016a74f525fc3b2271'
@@ -789,14 +868,29 @@ else
     "wine-esync=$pkgver"
   )
   conflicts=('wine' 'wine-wow64' 'wine-staging' 'wine-esync')
-  replaces=("${pkgname/%-git/-faudio-git}")
+  if [[ "$pkgname" == *-git ]]; then
+    replaces=("${pkgname/%-git/-faudio-git}")
+  fi
+fi
+
+if [ -n "$_localbuild" ]; then
+  _winesrcdir="$_localbuild"
+  _use_staging="false"
+  pkgname="$_localbuild"
+  if [ -n "$_PKGNAME_OVERRIDE" ]; then
+    if [ "$_PKGNAME_OVERRIDE" = "none" ]; then
+      pkgname="${pkgname}"
+    else
+      pkgname="${pkgname}-${_PKGNAME_OVERRIDE}"
+    fi
+    msg2 "Overriding default pkgname. New pkgname: ${pkgname}"
+  fi
 fi
 
 makedepends=("${makedepends[@]}" "${depends[@]}")
-install=wine.install
 
 nonuser_patcher() {
-  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW1" = "y" ]; then
+  if [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW1" =~ [yY] ]]; then
     if [ "$_nopatchmsg" != "true" ]; then
       _fullpatchmsg=" -- ( $_patchmsg )"
     fi
@@ -822,15 +916,35 @@ prepare() {
 	# state tracker start - FEAR THE MIGHTY FROG MINER
 	touch "${_where}"/BIG_UGLY_FROGMINER
 
-	# mingw-w64-gcc
-	if [ "$_NOMINGW" = "true" ]; then
-	  _configure_args+=(--without-mingw)
-	fi
-
 	# prepare steps
-	_source_cleanup > "$_where"/prepare.log
-	_prepare
+	if [ -z "$_localbuild" ]; then
+	  _source_cleanup > "$_where"/prepare.log
+	  _prepare
+	else
+	  echo -e "Building local source $_localbuild" > "$_where"/prepare.log
+	fi
+	_polish
 	_makedirs
+
+    if [ "$_allow_server_rt_prio" = "true" ]; then
+      if [ "$_EXTERNAL_INSTALL" = "true" ]; then
+        if [ "$_EXTERNAL_NOVER" = "true" ]; then
+          _serverpath="$_DEFAULT_EXTERNAL_PATH/$pkgname/bin/wineserver"
+        else
+          if [ "$_use_staging" = "true" ]; then
+            cd "$srcdir/$_stgsrcdir"
+          else
+            cd "$srcdir/$_winesrcdir"
+          fi
+          _realwineversion=$(_describe_wine)
+          _serverpath="$_DEFAULT_EXTERNAL_PATH/$pkgname-$_realwineversion/bin/wineserver"
+        fi
+      else
+        _serverpath="/usr/bin/wineserver"
+      fi
+      cp "$_where"/wine.install "$_where"/wine-tkg.install && sed -i "s|in /etc/security/limits.conf ;)\"|in /etc/security/limits.conf ;)\"\n  echo \"Setting wineserver capabilities\"\n  setcap cap_sys_nice+ep $_serverpath 2>/dev/null|g" "$_where"/wine-tkg.install
+      echo -e "post_upgrade() {\n  echo \"Setting wineserver capabilities\"\n  setcap cap_sys_nice+ep $_serverpath 2>/dev/null\n}" >> "$_where"/wine-tkg.install
+    fi
 }
 
 build() {
@@ -877,6 +991,12 @@ build() {
 }
 
 package() {
+  if [ "$_allow_server_rt_prio" = "true" ]; then
+    install=wine-tkg.install
+  else
+    install=wine.install
+  fi
+
   if [ "$_NOCOMPILE" != "true" ]; then
     _package_makepkg
   fi

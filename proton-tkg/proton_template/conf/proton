@@ -490,31 +490,15 @@ class CompatData:
             elif not ("wined3d9only" in g_session.compat_config or "wined3d" in g_session.compat_config) and "custom9" in g_session.compat_config:
                 g_session.dlloverrides["d3d9"] = "n"
 
+            if os.path.exists(g_proton.lib64_dir + "wine/vkd3d-proton/d3d12.dll"):
+                try_copy(g_proton.lib64_dir + "wine/vkd3d-proton/d3d12.dll",
+                    self.prefix_dir + "drive_c/windows/system32/d3d12.dll")
 
-# Copy-based setup from stock
-#            if "wined3d" in g_session.compat_config:
-#                dxvkfiles = []
-#                wined3dfiles = ["d3d11", "d3d10", "d3d10core", "d3d10_1", "dxgi", "d3d9"]
-#            else:
-#                dxvkfiles = ["d3d11", "d3d10", "d3d10core", "d3d10_1", "dxgi"]
-#                wined3dfiles = []
-#                if "d9vk" in g_session.compat_config:
-#                    dxvkfiles.append("d3d9")
-#                else:
-#                    wined3dfiles.append("d3d9")
-#
-#            for f in wined3dfiles:
-#                try_copy(g_proton.default_pfx_dir + "drive_c/windows/system32/" + f + ".dll",
-#                        self.prefix_dir + "drive_c/windows/system32/" + f + ".dll")
-#                try_copy(g_proton.default_pfx_dir + "drive_c/windows/syswow64/" + f + ".dll",
-#                        self.prefix_dir + "drive_c/windows/syswow64/" + f + ".dll")
-#
-#            for f in dxvkfiles:
-#                try_copy(g_proton.lib64_dir + "wine/dxvk/" + f + ".dll",
-#                        self.prefix_dir + "drive_c/windows/system32/" + f + ".dll")
-#                try_copy(g_proton.lib_dir + "wine/dxvk/" + f + ".dll",
-#                        self.prefix_dir + "drive_c/windows/syswow64/" + f + ".dll")
-#                g_session.dlloverrides[f] = "n"
+            if os.path.exists(g_proton.lib_dir + "wine/vkd3d-proton/d3d12.dll"):
+                try_copy(g_proton.lib_dir + "wine/vkd3d-proton/d3d12.dll",
+                    self.prefix_dir + "drive_c/windows/syswow64/d3d12.dll")
+                g_session.dlloverrides["d3d12"] = "n"
+
 
 def comma_escaped(s):
     escaped = False
@@ -638,13 +622,13 @@ class Session:
         self.check_environment("PROTON_BYPASS_SHADERCACHE_PATH", "shadercachepath")
 
         if not "__GL_SHADER_DISK_CACHE_PATH" in self.env and not "__GL_SHADER_DISK_CACHE_PATH" in os.environ:
-            log("NV shader cache path is undefined. Using prefix path as a fallback.")
+            #log("NV shader cache path is undefined. Using prefix path as a fallback.")
             self.env.setdefault("__GL_SHADER_DISK_CACHE_PATH", g_compatdata.prefix_dir)
         elif "shadercachepath" in self.compat_config:
             self.env["__GL_SHADER_DISK_CACHE_PATH"] = self.env["PROTON_BYPASS_SHADERCACHE_PATH"] + "/" + os.environ["SteamGameId"]
 
         if not "MESA_GLSL_CACHE_DIR" in self.env and not "MESA_GLSL_CACHE_DIR" in os.environ:
-            log("Mesa shader cache path is undefined. Using prefix path as a fallback.")
+            #log("Mesa shader cache path is undefined. Using prefix path as a fallback.")
             self.env.setdefault("MESA_GLSL_CACHE_DIR", g_compatdata.prefix_dir)
         elif "shadercachepath" in self.compat_config:
             self.env["MESA_GLSL_CACHE_DIR"] = self.env["PROTON_BYPASS_SHADERCACHE_PATH"] + "/" + os.environ["SteamGameId"]

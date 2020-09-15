@@ -6,12 +6,15 @@ _prebuild_common() {
 	echo "" >> "$_where"/last_build_config.log
 
 	# Use custom compiler paths if defined
-	if [ -n "${CUSTOM_MINGW_PATH}" ]; then
+	if [ -n "${CUSTOM_MINGW_PATH}" ] && [ -z "${CUSTOM_GCC_PATH}" ]; then
 	  PATH="${PATH}:${CUSTOM_MINGW_PATH}/bin:${CUSTOM_MINGW_PATH}/lib:${CUSTOM_MINGW_PATH}/include"
 	  echo -e "CUSTOM_MINGW_PATH = ${CUSTOM_MINGW_PATH##*/}" >> "$_where"/last_build_config.log
-	fi
-	if [ -n "${CUSTOM_GCC_PATH}" ]; then
+	elif [ -n "${CUSTOM_GCC_PATH}" ] && [ -z "${CUSTOM_MINGW_PATH}" ]; then
 	  PATH="${CUSTOM_GCC_PATH}/bin:${CUSTOM_GCC_PATH}/lib:${CUSTOM_GCC_PATH}/include:${PATH}"
+	  echo -e "CUSTOM_GCC_PATH = ${CUSTOM_GCC_PATH##*/}" >> "$_where"/last_build_config.log
+	elif [ -n "${CUSTOM_MINGW_PATH}" ] && [ -n "${CUSTOM_GCC_PATH}" ]; then
+	  PATH="${CUSTOM_GCC_PATH}/bin:${CUSTOM_GCC_PATH}/lib:${CUSTOM_GCC_PATH}/include:${CUSTOM_MINGW_PATH}/bin:${CUSTOM_MINGW_PATH}/lib:${CUSTOM_MINGW_PATH}/include:${PATH}"
+	  echo -e "CUSTOM_MINGW_PATH = ${CUSTOM_MINGW_PATH##*/}" >> "$_where"/last_build_config.log
 	  echo -e "CUSTOM_GCC_PATH = ${CUSTOM_GCC_PATH##*/}" >> "$_where"/last_build_config.log
 	fi
 
@@ -42,6 +45,11 @@ _prebuild_common() {
 	echo "LDFLAGS = ${LDFLAGS}" >> "$_where"/last_build_config.log
 	echo "CROSSCFLAGS = ${CROSSCFLAGS}" >> "$_where"/last_build_config.log
 	echo "CROSSLDFLAGS = ${CROSSLDFLAGS}" >> "$_where"/last_build_config.log
+
+	# Disable tests by default, enable back with _enable_tests="true"
+	if [ "$_ENABLE_TESTS" != "true" ]; then
+	  _configure_args+=(--disable-tests)
+	fi
 }
 
 _build() {
@@ -61,8 +69,8 @@ _build() {
 	  fi
 	  msg2 'Building Wine-64...'
 	  cd  "${srcdir}"/"${pkgname}"-64-build
-	  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW3" = "y" ]; then
-	    ../${_winesrcdir}/configure \
+	  if [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW3" =~ [yY] ]]; then
+	    ../"${_winesrcdir}"/configure \
 		    --prefix="$_prefix" \
 			--enable-win64 \
 			"${_configure_args64[@]}" \
@@ -105,14 +113,14 @@ _build() {
 	  fi
 	  msg2 'Building Wine-32...'
 	  cd "${srcdir}/${pkgname}"-32-build
-	  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW3" = "y" ]; then
+	  if [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW3" =~ [yY] ]]; then
 		 if [ "$_NOLIB64" = "true" ]; then
-	       ../${_winesrcdir}/configure \
+	       ../"${_winesrcdir}"/configure \
 		      --prefix="$_prefix" \
 		      "${_configure_args32[@]}" \
 		      "${_configure_args[@]}"
 		  else
-	        ../${_winesrcdir}/configure \
+	        ../"${_winesrcdir}"/configure \
 		      --prefix="$_prefix" \
 		      "${_configure_args32[@]}" \
 		      "${_configure_args[@]}" \
@@ -127,6 +135,13 @@ _build() {
 	    _buildtime32=$( time ( schedtool -B -n 1 -e ionice -n 1 make 2>&1 ) 3>&1 1>&2 2>&3 ) || _buildtime32=$( time ( make 2>&1 ) 3>&1 1>&2 2>&3 )
 	  fi
 	fi
+}
+
+_generate_debian_package() {
+	_prefix="$1"
+
+	msg2 'Generating a Debian package'
+	"$_where"/wine-tkg-scripts/package-debian.sh "${pkgdir}" "${_prefix}" "${_where}" "${pkgname}-${pkgver}.deb" "${pkgver}" "${pkgname}"
 }
 
 _package_nomakepkg() {
@@ -188,10 +203,11 @@ _package_nomakepkg() {
 
 	# wine-tkg path scripts - Might be useful for external builds when using weird env vars - Also workarounds wrong paths issues on non-Arch distros
 	cp -v "$_where"/wine-tkg-scripts/wine-tkg "$_prefix"/bin/wine-tkg
+	cp -v "$_where"/wine-tkg-scripts/wine64-tkg "$_prefix"/bin/wine64-tkg
 	cp -v "$_where"/wine-tkg-scripts/wine-tkg-interactive "$_prefix"/bin/wine-tkg-interactive
 
 	# strip
-	if [ "$_nomakepkg_strip" = "true" ]; then
+	if [ "$_pkg_strip" = "true" ]; then
 	  for _f in "$_prefix"/{bin,lib,lib32,lib64}/{wine/*,*}; do
 	    if [[ "$_f" = *.so ]] || [[ "$_f" = *.dll ]]; then
 	      strip --strip-unneeded "$_f"
@@ -211,6 +227,10 @@ _package_nomakepkg() {
 	  pkgdir="$_where/non-makepkg-builds/${_nomakepkg_pkgname}"
 	else
 	  pkgdir="${_nomakepkg_prefix_path}/${_nomakepkg_pkgname}"
+	fi
+
+	if [ "$_GENERATE_DEBIAN_PACKAGE" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
+		_generate_debian_package "$_prefix"
 	fi
 
 	if [ "$_use_esync" = "true" ] || [ "$_staging_esync" = "true" ]; then
@@ -318,9 +338,14 @@ _package_makepkg() {
 
 	# wine-tkg path scripts - Might be useful for external builds when using weird env vars - Also workarounds wrong paths issues on non-Arch distros
 	cp "$_where"/wine-tkg-scripts/wine-tkg "${pkgdir}$_prefix"/bin/wine-tkg
+	cp "$_where"/wine-tkg-scripts/wine64-tkg "${pkgdir}$_prefix"/bin/wine64-tkg
 	cp "$_where"/wine-tkg-scripts/wine-tkg-interactive "${pkgdir}$_prefix"/bin/wine-tkg-interactive
 
 	cp "$_where"/last_build_config.log "${pkgdir}$_prefix"/share/wine/wine-tkg-config.txt
+
+	if [ "$_GENERATE_DEBIAN_PACKAGE" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
+		_generate_debian_package "$_prefix"
+	fi
 
 	if [ "$_use_esync" = "true" ] || [ "$_staging_esync" = "true" ]; then
 	  msg2 '##########################################################################################################################'

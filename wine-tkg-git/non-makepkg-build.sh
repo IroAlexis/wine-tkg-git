@@ -86,7 +86,9 @@ pkgver() {
   # disable faudio check so we don't fail to build even if faudio libs are missing
   _faudio_ignorecheck="true"
 
-  _pkgnaming
+  if [ -z "$_localbuild" ]; then
+    _pkgnaming
+  fi
 
   # remove the faudio pkgname tag as we can't be sure it'll get used even if enabled
   pkgname="${pkgname/-faudio-git/}"
@@ -159,7 +161,7 @@ _nomakepkgsrcinit() {
 }
 
 nonuser_patcher() {
-  if [ "$_NUKR" != "debug" ] || [ "$_DEBUGANSW1" = "y" ]; then
+  if [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW1" =~ [yY] ]]; then
     if [ "$_nopatchmsg" != "true" ]; then
       _fullpatchmsg=" -- ( $_patchmsg )"
     fi
@@ -179,25 +181,36 @@ build_wine_tkg() {
   # state tracker start - FEAR THE MIGHTY FROG MINER
   touch "${_where}"/BIG_UGLY_FROGMINER
 
-  # mingw-w64-gcc
-  if [ "$_NOMINGW" = "true" ]; then
-    _configure_args+=(--without-mingw)
-  fi
-
   if [ "$_SKIPBUILDING" != "true" ]; then
     msg2 "Cloning and preparing sources... Please be patient."
-    _nomakepkgsrcinit > "$_where"/prepare.log 2>&1
+    if [ -z "$_localbuild" ]; then
+      _nomakepkgsrcinit > "$_where"/prepare.log 2>&1
 
-    _source_cleanup >> "$_where"/prepare.log
-    _prepare
+      _source_cleanup >> "$_where"/prepare.log
+      _prepare
+    else
+      _winesrcdir="$_localbuild"
+      _use_staging="false"
+      pkgname="$_localbuild"
+      echo -e "Building local source $_localbuild" > "$_where"/prepare.log
+      if [ -n "$_PKGNAME_OVERRIDE" ]; then
+        if [ "$_PKGNAME_OVERRIDE" = "none" ]; then
+          pkgname="${pkgname}"
+        else
+          pkgname="${pkgname}-${_PKGNAME_OVERRIDE}"
+        fi
+        msg2 "Overriding default pkgname. New pkgname: ${pkgname}"
+      fi
+    fi
     ## prepare step end
-
-    _prebuild_common
   fi
 
   pkgver=$(pkgver)
 
+  _polish
   _makedirs
+
+  _prebuild_common
 
   if [ "$_nomakepkg_nover" = "true" ] ; then
     _nomakepkg_pkgname="${pkgname}"

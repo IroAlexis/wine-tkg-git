@@ -16,8 +16,25 @@ _nowhere="$PWD"
 _nomakepkg="true"
 _no_steampath="false"
 
-# Build vkd3d - Requires Wine installed system-wide
-_build_vkd3d="false"
+function ressources_cleanup {
+  # The symlinks switch doesn't need the recursive flag, but we'll use it temporarily
+  # as a smoother transition for existing users with dirty trees
+  rm -rf "${_nowhere}"/{Proton,vkd3d-proton,dxvk-tools,dxvk,liberation-fonts,mono,gecko}
+}
+
+trap ressources_cleanup EXIT
+
+ressources_cleanup
+
+_ressources_path="${_nowhere}/external-ressources"
+mkdir -p "${_ressources_path}"/{Proton,vkd3d-proton,dxvk-tools,dxvk,liberation-fonts,mono,gecko}
+ln -s "${_ressources_path}"/Proton "${_nowhere}"/Proton
+ln -s "${_ressources_path}"/vkd3d-proton "${_nowhere}"/vkd3d-proton
+ln -s "${_ressources_path}"/dxvk-tools "${_nowhere}"/dxvk-tools
+ln -s "${_ressources_path}"/dxvk "${_nowhere}"/dxvk
+ln -s "${_ressources_path}"/liberation-fonts "${_nowhere}"/liberation-fonts
+ln -s "${_ressources_path}"/mono "${_nowhere}"/mono
+ln -s "${_ressources_path}"/gecko "${_nowhere}"/gecko
 
 # Enforce using makepkg when using --makepkg
 if [ "$1" = "--makepkg" ]; then
@@ -70,6 +87,7 @@ EOF
 
 function build_vrclient {
   cd "$_nowhere"/Proton
+  source "$_nowhere/proton_tkg_token"
   git clone https://github.com/ValveSoftware/openvr.git || true # It'll complain the path already exists on subsequent builds
   cd openvr
   git reset --hard HEAD
@@ -105,7 +123,7 @@ function build_vrclient {
   winemaker $WINEMAKERFLAGS --wine32 -L"$_nowhere/proton_dist_tmp/lib/" -L"$_nowhere/proton_dist_tmp/lib/wine/" -I"$_nowhere/Proton/build/vrclient.win32/vrclient/" -I"$_nowhere/Proton/build/vrclient.win32/" vrclient
   make -e CC="winegcc -m32" CXX="wineg++ -m32 $_cxx_addon" -C "$_nowhere/Proton/build/vrclient.win32/vrclient" -j$(nproc) && strip vrclient/vrclient.dll.so
   winebuild --dll --fake-module -E "$_nowhere/Proton/build/vrclient.win32/vrclient/vrclient.spec" -o vrclient.dll.fake
-  cd $_nowhere
+  cd "$_nowhere"
 
   # Inject vrclient & openvr libs in our wine-tkg-git build
   cp -v Proton/build/vrclient.win64/vrclient_x64/vrclient_x64.dll.so proton_dist_tmp/lib64/wine/ && cp -v Proton/build/vrclient.win64/vrclient_x64.dll.fake proton_dist_tmp/lib64/wine/fakedlls/vrclient_x64.dll
@@ -117,6 +135,7 @@ function build_vrclient {
 
 function build_lsteamclient {
   cd "$_nowhere"/Proton
+  source "$_nowhere/proton_tkg_token"
   export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --nomsvcrt --dll -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/ -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
   export CFLAGS="-O2 -g"
   export CXXFLAGS="-fpermissive -Wno-attributes -O2 -g"
@@ -145,7 +164,7 @@ function build_lsteamclient {
   cd build/lsteamclient.win32
   winemaker $WINEMAKERFLAGS --wine32 -DSTEAM_API_EXPORTS -L"$_nowhere/proton_dist_tmp/lib/" -L"$_nowhere/proton_dist_tmp/lib/wine/" .
   make -e CC="winegcc -m32" CXX="wineg++ -m32 $_cxx_addon" -C "$_nowhere/Proton/build/lsteamclient.win32" -j$(nproc) && strip lsteamclient.dll.so
-  cd $_nowhere
+  cd "$_nowhere"
 
   # Inject lsteamclient libs in our wine-tkg-git build
   cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/
@@ -154,41 +173,51 @@ function build_lsteamclient {
 
 function build_vkd3d {
   cd "$_nowhere"
-  mkdir -p vkd3d-fork-build && cd vkd3d-fork-build
-  git clone https://github.com/HansKristian-Work/vkd3d.git || true # It'll complain the path already exists on subsequent builds
-  cd vkd3d
+  source "$_nowhere/proton_tkg_token"
+  git clone https://github.com/HansKristian-Work/vkd3d-proton.git || true # It'll complain the path already exists on subsequent builds
+  cd vkd3d-proton
   git reset --hard HEAD
   git clean -xdf
   git pull origin master
-  ./autogen.sh
-  cd ..
-
-  export CFLAGS="-O2 -g -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
-  export CXXFLAGS="-Wno-attributes -O2 -g -I$_wine_tkg_git_path/src/$_winesrcdir/include/"
-  export PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
+  git submodule update --init --recursive
 
   rm -rf build/lib64-vkd3d
   rm -rf build/lib32-vkd3d
-  mkdir -p build/lib64-vkd3d/out
-  mkdir -p build/lib32-vkd3d/out
+  mkdir -p build/lib64-vkd3d
+  mkdir -p build/lib32-vkd3d
 
-  export CC='gcc -m64'
-  export CXX='g++ -m64'
-  cd build/lib64-vkd3d
-  "$_nowhere"/vkd3d-fork-build/vkd3d/configure --prefix="$_nowhere/vkd3d-fork-build/build/lib64-vkd3d/out" --with-spirv-tools
-  make -j$(nproc) -C "$_nowhere/vkd3d-fork-build/build/lib64-vkd3d" && make install
-  cd ../..
+  export CFLAGS="-pipe -O2 -ftree-vectorize"
+  export CPPFLAGS="-pipe -O2 -ftree-vectorize"
+  export CXXFLAGS="-pipe -O2 -ftree-vectorize"
+  export LDFLAGS="-Wl,-O1,--sort-common,--as-needed"
 
-  export CC='gcc -m32'
-  export CXX='g++ -m32'
-  cd build/lib32-vkd3d
-  "$_nowhere"/vkd3d-fork-build/vkd3d/configure --prefix="$_nowhere/vkd3d-fork-build/build/lib32-vkd3d/out" --with-spirv-tools
-  make -j$(nproc) -C "$_nowhere/vkd3d-fork-build/build/lib32-vkd3d" && make install
-  cd $_nowhere
+  meson --cross-file build-win64.txt -Denable_standalone_d3d12=True --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib64-vkd3d "$_nowhere"/vkd3d-proton/build/lib64-vkd3d
+  cd "$_nowhere"/vkd3d-proton/build/lib64-vkd3d && ninja install
+  cd "$_nowhere"/vkd3d-proton
+
+  meson --cross-file build-win32.txt -Denable_standalone_d3d12=True  --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib32-vkd3d "$_nowhere"/vkd3d-proton/build/lib32-vkd3d
+  cd "$_nowhere"/vkd3d-proton/build/lib32-vkd3d && ninja install
+
+  cd "$_nowhere"
+}
+
+function build_dxvk {
+  cd "$_nowhere"
+  git clone https://github.com/Frogging-Family/dxvk-tools.git || true # It'll complain the path already exists on subsequent builds
+  cd dxvk-tools
+  git reset --hard HEAD
+  git clean -xdf
+  git pull origin master
+
+  ./updxvk build
+  export _proton_tkg_path="proton-tkg" && ./updxvk proton-tkg
+
+  cd "$_nowhere"
 }
 
 function build_steamhelper {
   if [[ $_proton_branch != proton_3.* ]]; then
+    source "$_nowhere/proton_tkg_token"
     rm -rf Proton/build/steam.win32
     mkdir -p Proton/build/steam.win32
     cp -a Proton/steam_helper/* Proton/build/steam.win32
@@ -202,7 +231,7 @@ function build_steamhelper {
 
     winemaker $WINEMAKERFLAGS --guiexe -lsteam_api -lole32 -I"$_nowhere/Proton/build/lsteamclient.win32/steamworks_sdk_142/" -L"$_nowhere/Proton/steam_helper" .
     make -e CC="winegcc -m32" CXX="wineg++ -m32" -C "$_nowhere/Proton/build/steam.win32" -j$(nproc) && strip steam.exe.so
-    cd $_nowhere
+    cd "$_nowhere"
 
     # Inject steam helper winelib and libsteam_api lib in our wine-tkg-git build
     cp -v Proton/build/steam.win32/steam.exe.so proton_dist_tmp/lib/wine/
@@ -218,8 +247,8 @@ proton_patcher() {
 	    printf '%s\n' "${_patches[@]}"
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
-	  if [ "$_CONDITION" = "y" ] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        echo "######################################################"
 	        echo ""
@@ -233,14 +262,14 @@ proton_patcher() {
 	fi
 
 	_patches=("$_nowhere"/proton-tkg-userpatches/*."${_userpatch_ext}patch")
-	if [ ${#_patches[@]} -ge 2 ] || [ -e "${_patches}" ]; then
+	if [ "${#_patches[@]}" -ge 2 ] || [ -e "${_patches}" ]; then
 	  if [ "$_user_patches_no_confirm" != "true" ]; then
 	    echo "Found ${#_patches[@]} userpatches for ${_userpatch_target}:"
 	    printf '%s\n' "${_patches[@]}"
 	    read -rp "Do you want to install it/them? - Be careful with that ;)"$'\n> N/y : ' _CONDITION;
 	  fi
-	  if [ "$_CONDITION" = "y" ] || [ "$_user_patches_no_confirm" = "true" ]; then
-	    for _f in "${_patches[@]}"; do
+	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
+	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
 	        echo "######################################################"
 	        echo ""
@@ -284,7 +313,7 @@ function proton_tkg_uninstaller {
 
     steam_is_running
 
-    cp $_config_file $_config_file.bak && echo "Your config.vdf file was backed up from $_config_file (.bak)" && echo ""
+    cp "$_config_file" "$_config_file".bak && echo "Your config.vdf file was backed up from $_config_file (.bak)" && echo ""
 
     echo "What Proton-tkg build do you want to uninstall?"
 
@@ -298,7 +327,7 @@ function proton_tkg_uninstaller {
     i=1
     for build in ${_strip_builds[@]}; do
       if [ "$_to_uninstall" = "$i" ]; then
-        rm -rf "proton_tkg_$build" && _available_builds=( `ls -d proton_tkg_* | sort -V` ) && _newest_build="${_available_builds[-1]//proton_tkg_/}" && sed -i "s/\"Proton-tkg $build\"/\"Proton-tkg ${_newest_build[@]}\"/" $_config_file
+        rm -rf "proton_tkg_$build" && _available_builds=( `ls -d proton_tkg_* | sort -V` ) && _newest_build="${_available_builds[-1]//proton_tkg_/}" && sed -i "s/\"Proton-tkg $build\"/\"Proton-tkg ${_newest_build[@]}\"/" "$_config_file"
         echo "###########################################################################################################################"
         echo ""
         echo "Proton-tkg $build was uninstalled and games previously depending on it will now use Proton-tkg ${_newest_build[@]} instead."
@@ -311,7 +340,7 @@ function proton_tkg_uninstaller {
     echo ""
     read -rp "Wanna uninstall more? N/y: " _uninstall_more;
     echo ""
-    if [ "$_uninstall_more" = "y" ]; then
+    if [[ "$_uninstall_more" =~ [yY] ]]; then
       proton_tkg_uninstaller
     fi
   elif [ -d "$_GOTCHA" ] && [ $i -eq 1 ]; then
@@ -334,36 +363,47 @@ function setup_dxvk_version_url {
 
 function download_dxvk_version {
   while true ; do
-      setup_dxvk_version_url
-      # If anything goes wrong we get exit code 22 from "curl -f"
-      set +e
-      _dxvk_version_response=$(curl -s -f "$_dxvk_version_url")
-      _dxvk_version_response_status=$?
-      set -e
-      if [ $_dxvk_version_response_status -eq 0 ]; then
+      if [ "$_use_dxvk" = "latest" ]; then
         echo "#######################################################"
         echo ""
-        echo " Downloading ${_dxvk_version} DXVK release from github for you..."
+        echo " Downloading latest DXVK artifact from git.froggi.es for you..."
         echo ""
         echo "#######################################################"
         echo ""
-        echo "$_dxvk_version_response" \
-        | grep "browser_download_url.*tar.gz" \
-        | cut -d : -f 2,3 \
-        | tr -d \" \
-        | wget -qi -
+        wget -q -O dxvk-latest-artifact.zip "https://git.froggi.es/doitsujin/dxvk/-/jobs/artifacts/master/download?job=dxvk"
         break
       else
-        echo ""
-        echo "#######################################################"
-        echo ""
-        echo " Could not download specified DXVK version (${_dxvk_version})"
-        echo ""
-        echo "#######################################################"
-        echo ""
-        echo "Please select DXVK release version (ex: v1.6.1)"
-        read -rp "> [latest]: " _dxvk_version
-        echo ""
+        setup_dxvk_version_url
+        # If anything goes wrong we get exit code 22 from "curl -f"
+        set +e
+        _dxvk_version_response=$(curl -s -f "$_dxvk_version_url")
+        _dxvk_version_response_status=$?
+        set -e
+        if [ $_dxvk_version_response_status -eq 0 ]; then
+          echo "#######################################################"
+          echo ""
+          echo " Downloading ${_dxvk_version} DXVK release from github for you..."
+          echo ""
+          echo "#######################################################"
+          echo ""
+          echo "$_dxvk_version_response" \
+          | grep "browser_download_url.*tar.gz" \
+          | cut -d : -f 2,3 \
+          | tr -d \" \
+          | wget -qi -
+          break
+        else
+          echo ""
+          echo "#######################################################"
+          echo ""
+          echo " Could not download specified DXVK version (${_dxvk_version})"
+          echo ""
+          echo "#######################################################"
+          echo ""
+          echo "Please select DXVK release version (ex: v1.6.1)"
+          read -rp "> [latest]: " _dxvk_version
+          echo ""
+        fi
       fi
   done
 }
@@ -380,6 +420,8 @@ elif [ "$1" = "build_lsteamclient" ]; then
   build_lsteamclient
 elif [ "$1" = "build_vkd3d" ]; then
   build_vkd3d
+elif [ "$1" = "build_dxvk" ]; then
+  build_dxvk
 elif [ "$1" = "build_steamhelper" ]; then
   build_steamhelper
 else
@@ -394,11 +436,6 @@ else
   fi
 
   rm -rf "$_nowhere"/proton_dist_tmp
-
-  # Build vkd3d
-  if [ "$_build_vkd3d" = "true" ]; then
-    build_vkd3d
-  fi
 
   cd "$_nowhere"
 
@@ -417,12 +454,39 @@ else
   # Wine-tkg-git has injected versioning and settings in the token for us, so get the values back
   source "$_nowhere/proton_tkg_token"
 
+  # Use custom compiler paths if defined
+  if [ -n "${CUSTOM_MINGW_PATH}" ] && [ -z "${CUSTOM_GCC_PATH}" ]; then
+    PATH="${PATH}:${CUSTOM_MINGW_PATH}/bin:${CUSTOM_MINGW_PATH}/lib:${CUSTOM_MINGW_PATH}/include"
+  elif [ -n "${CUSTOM_GCC_PATH}" ] && [ -z "${CUSTOM_MINGW_PATH}" ]; then
+    PATH="${CUSTOM_GCC_PATH}/bin:${CUSTOM_GCC_PATH}/lib:${CUSTOM_GCC_PATH}/include:${PATH}"
+  elif [ -n "${CUSTOM_MINGW_PATH}" ] && [ -n "${CUSTOM_GCC_PATH}" ]; then
+    PATH="${CUSTOM_GCC_PATH}/bin:${CUSTOM_GCC_PATH}/lib:${CUSTOM_GCC_PATH}/include:${CUSTOM_MINGW_PATH}/bin:${CUSTOM_MINGW_PATH}/lib:${CUSTOM_MINGW_PATH}/include:${PATH}"
+  fi
+
+  # If mingw-w64 gcc can't be found, disable building vkd3d-proton
+  if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
+    echo -e "######\nmingw-w64 gcc not found - vkd3d-proton and dxvk won't be built\n######"
+    _build_vkd3d="false"
+    if [ "$_use_dxvk" = "git" ]; then
+      _use_dxvk="latest"
+    fi
+  else
+    if [ "$_use_vkd3dlib" = "false" ]; then
+      _build_vkd3d="true"
+    fi
+    echo -e "######\nmingw-w64 gcc found\n######"
+  fi
+
   # Copy the resulting package in here to begin our work
   if [ -e "$_proton_pkgdest"/../HL3_confirmed ]; then
 
-    cd $_nowhere
+    cd "$_nowhere"
 
     # Create required dirs and clean
+    if [ -z "$_protontkg_true_version" ]; then
+      export _protontkg_true_version="$_protontkg_version"
+    fi
+
     rm -rf "proton_tkg_$_protontkg_version" && mkdir "proton_tkg_$_protontkg_version"
     mkdir -p proton_template/share/fonts
 
@@ -464,7 +528,8 @@ else
     fontforge -script "$_nowhere/Proton/fonts/scripts/generatefont.pe" "$_nowhere/proton_template/share/fonts/LiberationMono-Regular" "CourierNew" "Courier New" "Courier New"
 
     # Grab share template and inject version
-    echo "1552061114 proton-tkg-$_protontkg_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
+    _versionpre=`date '+%s'`
+    echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
 
     # Create the dxvk dirs
     mkdir -p "$_nowhere/proton_dist_tmp/lib64/wine/dxvk"
@@ -482,24 +547,39 @@ else
     # Build steam helper
     build_steamhelper
 
-    # Inject vkd3d libs in our wine-tkg-git build
+    # vkd3d
+    # Build vkd3d-proton when vkd3dlib is disabled - Requires MinGW-w64-gcc or it won't be built
     if [ "$_build_vkd3d" = "true" ]; then
-      for f in "$_nowhere"/vkd3d-fork-build/build/lib64-vkd3d/out/lib/libvkd3d*so*; do
-        strip "$f" && cp -v "$f" proton_dist_tmp/lib64/
-      done
-      for f in "$_nowhere"/vkd3d-fork-build/build/lib32-vkd3d/out/lib/libvkd3d*so*; do
-        strip "$f" && cp -v "$f" proton_dist_tmp/lib/
-      done
+      build_vkd3d
+      mkdir -p proton_dist_tmp/lib64/wine/vkd3d-proton
+      mkdir -p proton_dist_tmp/lib/wine/vkd3d-proton
+      cp -v "$_nowhere"/vkd3d-proton/build/lib64-vkd3d/bin/* proton_dist_tmp/lib64/wine/vkd3d-proton/
+      cp -v "$_nowhere"/vkd3d-proton/build/lib32-vkd3d/bin/* proton_dist_tmp/lib/wine/vkd3d-proton/
     fi
 
     # dxvk
     if [ "$_use_dxvk" != "false" ]; then
-      if [ ! -d "$_nowhere"/dxvk ] || [ "$_use_dxvk" = "release" ]; then
+      if [ "$_use_dxvk" = "git" ]; then
+        build_dxvk
+      elif ( [ ! -d "$_nowhere"/dxvk ] && [ ! -e "$_nowhere"/dxvk ] ) || [ "$_use_dxvk" = "release" ] || [ "$_use_dxvk" = "latest" ]; then
         rm -rf "$_nowhere"/dxvk
-        download_dxvk_version
-        tar -xvf dxvk-*.tar.gz >/dev/null 2>&1
-        rm -f dxvk-*.tar.*
-        mv "$_nowhere"/dxvk-* "$_nowhere"/dxvk
+        if [ "$_use_dxvk" = "latest" ]; then
+          # Download it & extract it into a temporary folder so we don't mess up the build in case proton-tkg also has/will have a folder "$_nowhere"/build (that folder is in the artifact zip)
+          rm -rf "$_nowhere"/tmp-dxvk-artifact
+          mkdir "$_nowhere"/tmp-dxvk-artifact
+          cd "$_nowhere"/tmp-dxvk-artifact
+          download_dxvk_version
+          unzip dxvk-latest-artifact.zip >/dev/null 2>&1
+          rm -f dxvk-latest-artifact.zip
+          mv "$_nowhere"/tmp-dxvk-artifact/build/dxvk-* "$_nowhere"/dxvk
+          cd "$_nowhere"
+          rm -rf "$_nowhere"/tmp-dxvk-artifact
+        else
+          download_dxvk_version
+          tar -xvf dxvk-*.tar.gz >/dev/null 2>&1
+          rm -f dxvk-*.tar.*
+          mv "$_nowhere"/dxvk-* "$_nowhere"/dxvk
+        fi
       fi
       # Remove d3d10.dll and d3d10_1.dll when using a 5.3 base or newer - https://github.com/doitsujin/dxvk/releases/tag/v1.6
       if [ "$_dxvk_minimald3d10" = "true" ]; then
@@ -549,7 +629,7 @@ else
     cd "$_nowhere" && rm -rf proton_dist_tmp
 
     # Grab conf template and inject version
-    echo "1552061114 proton-tkg-$_protontkg_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
+    echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
 
     # Patch our proton script to use the current proton tree prefix version value
     _prefix_version=$(cat "$_nowhere/Proton/proton" | grep "CURRENT_PREFIX_VERSION=")
@@ -647,7 +727,7 @@ else
       sed -i 's/.*PROTON_USE_WINED3D9.*/     "PROTON_USE_WINED3D9": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
     fi
 
-    cd $_nowhere
+    cd "$_nowhere"
 
     if [ "$_ispkgbuild" != "true" ]; then
       if [ "$_no_steampath" != "y" ]; then
@@ -674,7 +754,7 @@ else
           if [ "$_skip_uninstaller" != "true" ]; then
             echo ""
             read -rp "Do you want to run the uninstaller to remove previous/superfluous builds? N/y: " _ask_uninstall;
-            if [ "$_ask_uninstall" = "y" ]; then
+            if [[ "$_ask_uninstall" =~ [yY] ]]; then
               proton_tkg_uninstaller
             fi
           fi
@@ -688,7 +768,7 @@ else
       fi
     fi
   else
-    rm $_nowhere/proton_tkg_token
+    rm "$_nowhere"/proton_tkg_token
     echo "The required initial proton_dist build is missing! Wine-tkg-git compilation may have failed."
   fi
 fi
