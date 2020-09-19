@@ -625,12 +625,13 @@ _prepare() {
 	  echo -e "( Kernelbase reverts clean reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
+	_commitmsg="01-reverts" _committer
+
 	# Don't include *.orig and *~ files in the generated staging patchsets
 	if [ "$_generate_patchsets" != "false" ] && [ "$_use_staging" = "true" ]; then
 	  echo -e "*.orig\n*~" >> "${srcdir}"/"${_stgsrcdir}"/.gitignore
+	  _commitmsg="gitignore" _committer
 	fi
-
-	_commitmsg="01-reverts" _committer
 
 	# Hotfixer-staging
 	if [ "$_use_staging" = "true" ]; then
@@ -1852,7 +1853,7 @@ EOM
 	  if [ "$_wined3d_additions" = "true" ] && [ "$_use_staging" = "false" ]; then
 	    _patchname='proton-wined3d-additions.patch' && _patchmsg="Enable Proton non-vr-related wined3d additions" && nonuser_patcher
 	  fi
-	  if [ "$_steamvr_support" = "true" ]; then
+	  if [ "$_steamvr_support" = "true" ] && [ "$_proton_fs_hack" = "true" ]; then
 	    if git merge-base --is-ancestor a6d74b0545afcbf05d53fcbc9641ecc36c3be95c HEAD; then
 	      _patchname='proton-vr.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
 	    elif git merge-base --is-ancestor c736321633c6a247b406be50b1780ca0439ef8b0 HEAD; then

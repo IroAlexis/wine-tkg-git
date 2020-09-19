@@ -101,8 +101,8 @@ function build_vrclient {
   export CXXFLAGS="-Wno-attributes -std=c++0x -O2 -g"
   PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
   if [ "$_standard_dlopen" = "true" ]; then
-    patch -Np1 < "$_nowhere/proton_template/vrclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch"
-    _cxx_addon+=" -ldl"
+    patch -Np1 < "$_nowhere/proton_template/vrclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch" || true
+    WINEMAKERFLAGS+=" -ldl"
   fi
 
   rm -rf build/vrclient.win64
@@ -143,8 +143,8 @@ function build_lsteamclient {
   if [[ "$_proton_branch" != proton_3.* ]] && [[ "$_proton_branch" != proton_4.* ]]; then
     _cxx_addon="-std=gnu++11"
     if [ "$_standard_dlopen" = "true" ]; then
-      patch -Np1 < "$_nowhere/proton_template/steamclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch"
-      _cxx_addon+=" -ldl"
+      patch -Np1 < "$_nowhere/proton_template/steamclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch" || true
+      WINEMAKERFLAGS+=" -ldl"
     fi
   fi
 
@@ -186,16 +186,16 @@ function build_vkd3d {
   mkdir -p build/lib64-vkd3d
   mkdir -p build/lib32-vkd3d
 
-  export CFLAGS="-pipe -O2 -ftree-vectorize"
-  export CPPFLAGS="-pipe -O2 -ftree-vectorize"
-  export CXXFLAGS="-pipe -O2 -ftree-vectorize"
-  export LDFLAGS="-Wl,-O1,--sort-common,--as-needed"
+  unset CFLAGS
+  unset CPPFLAGS
+  unset CXXFLAGS
+  unset LDFLAGS
 
   meson --cross-file build-win64.txt -Denable_standalone_d3d12=True --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib64-vkd3d "$_nowhere"/vkd3d-proton/build/lib64-vkd3d
   cd "$_nowhere"/vkd3d-proton/build/lib64-vkd3d && ninja install
   cd "$_nowhere"/vkd3d-proton
 
-  meson --cross-file build-win32.txt -Denable_standalone_d3d12=True  --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib32-vkd3d "$_nowhere"/vkd3d-proton/build/lib32-vkd3d
+  meson --cross-file build-win32.txt -Denable_standalone_d3d12=True --buildtype release --strip -Denable_tests=false --prefix "$_nowhere"/vkd3d-proton/build/lib32-vkd3d "$_nowhere"/vkd3d-proton/build/lib32-vkd3d
   cd "$_nowhere"/vkd3d-proton/build/lib32-vkd3d && ninja install
 
   cd "$_nowhere"
@@ -444,11 +444,11 @@ else
 
   # Now let's build
   cd "$_wine_tkg_git_path"
-  if [ ! -e "/usr/bin/makepkg" ] || [ "$_nomakepkg" = "true" ]; then
+  if [ -e "/usr/bin/makepkg" ] && [ "$_nomakepkg" = "false" ]; then
+    makepkg -s || true
+  else
     rm -f "$_wine_tkg_git_path"/non-makepkg-builds/HL3_confirmed
     ./non-makepkg-build.sh
-  else
-    makepkg -s || true
   fi
 
   # Wine-tkg-git has injected versioning and settings in the token for us, so get the values back
