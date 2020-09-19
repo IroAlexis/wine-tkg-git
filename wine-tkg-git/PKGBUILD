@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play
-pkgver=5.9.r7.g8be56c21
+pkgver=5.9.r14.gf132e60b
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
