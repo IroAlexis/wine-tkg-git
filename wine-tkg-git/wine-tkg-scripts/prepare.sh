@@ -304,7 +304,10 @@ user_patcher() {
 	        msg2 "######################################################"
 	        echo -e "\nReverting your own patch ${_f##*/}" >> "$_where"/prepare.log
 	        if ! patch -Np1 -R < "${_f}" >> "$_where"/prepare.log; then
-	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1
+	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience."
+	          msg2 "To use the last known good mainline version, please set _plain_version=\"$_last_known_good_mainline\" in your .cfg"
+	          msg2 "To use the last known good staging version, please set _staging_version=\"$_last_known_good_staging\" in your .cfg (requires _use_staging=\"true\")"
+	          exit 1
 	        fi
 	        echo -e "Reverted your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
@@ -329,7 +332,10 @@ user_patcher() {
 	        msg2 "######################################################"
 	        echo -e "\nApplying your own patch ${_f##*/}" >> "$_where"/prepare.log
 	        if ! patch -Np1 < "${_f}" >> "$_where"/prepare.log; then
-	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1
+	          error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience."
+	          msg2 "To use the last known good mainline version, please set _plain_version=\"$_last_known_good_mainline\" in your .cfg"
+	          msg2 "To use the last known good staging version, please set _staging_version=\"$_last_known_good_staging\" in your .cfg (requires _use_staging=\"true\")"
+	          exit 1
 	        fi
 	        echo -e "Applied your own patch ${_f##*/}" >> "$_where"/last_build_config.log
 	      fi
@@ -566,6 +572,9 @@ _prepare() {
 	    _committorevert=81f8b6e8c215dc04a19438e4369fcba8f7f4f333 && nonuser_reverter
 	    echo -e "( FS hack unbreak reverts applied )\n" >> "$_where"/last_build_config.log
 	  elif git merge-base --is-ancestor 2538b0100fbbe1223e7c18a52bade5cfe5f8d3e3 HEAD; then #todo - backports
+	    _committorevert=4a330b29212402b9700828be82939112bd11a786 && nonuser_reverter
+	    _committorevert=bbae35f0fb04ea7efb8e1d6e5535e42715ae7766 && nonuser_reverter
+	    _committorevert=ec245c7e300f7cb779cf404079872f68c812585e && nonuser_reverter
 	    _committorevert=586f68f414924b1e41fec10a72b1aacced068885 && nonuser_reverter
 	    _committorevert=d9625e5a01a52496d1fb7f1a9a691fd3ec8332db && nonuser_reverter
 	    _committorevert=715a04daabdab616b530ef5a937827df7c2523c3 && nonuser_reverter
@@ -623,6 +632,11 @@ _prepare() {
 	  _committorevert=e5354008f46bc0e345c06ac06a7a7780faa9398b && nonuser_reverter
 	  _committorevert=461b5e56f95eb095d97e4af1cb1c5fd64bb2862a && nonuser_reverter
 	  echo -e "( Kernelbase reverts clean reverts applied )\n" >> "$_where"/last_build_config.log
+	fi
+
+	if [ "$_use_vkd3dlib" = "fork" ]; then
+	  _committorevert=2558f5f218d623772f6d8609a951ea70b3f6f823 && nonuser_reverter
+	  echo -e "( wined3d reverts for vkd3d-proton applied )\n" >> "$_where"/last_build_config.log
 	fi
 
 	_commitmsg="01-reverts" _committer
@@ -920,7 +934,7 @@ _prepare() {
 
 	if [ "$_use_staging" = "true" ] && [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW2" =~ [yY] ]]; then
 	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args[@]}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
-	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}" >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience." && exit 1)
+	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all "${_staging_args[@]}" >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience."; msg2 "To use the last known good mainline version, please set _plain_version=\"$_last_known_good_mainline\" in your .cfg"; msg2 "To use the last known good staging version, please set _staging_version=\"$_last_known_good_staging\" in your .cfg (requires _use_staging=\"true\")" && exit 1)
 
 	  # Remove staging version tag
 	  sed -i "s/  (Staging)//g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
@@ -1854,8 +1868,10 @@ EOM
 	    _patchname='proton-wined3d-additions.patch' && _patchmsg="Enable Proton non-vr-related wined3d additions" && nonuser_patcher
 	  fi
 	  if [ "$_steamvr_support" = "true" ] && [ "$_proton_fs_hack" = "true" ]; then
-	    if git merge-base --is-ancestor a6d74b0545afcbf05d53fcbc9641ecc36c3be95c HEAD; then
+	    if git merge-base --is-ancestor e447e86ae2fbfbd9dee1b488e38a653aaea5447e HEAD; then
 	      _patchname='proton-vr.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
+	    elif git merge-base --is-ancestor a6d74b0545afcbf05d53fcbc9641ecc36c3be95c HEAD; then
+	      _patchname='proton-vr-e447e86.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
 	    elif git merge-base --is-ancestor c736321633c6a247b406be50b1780ca0439ef8b0 HEAD; then
 	      _patchname='proton-vr-a6d74b.patch' && _patchmsg="Enable Proton vr-related wined3d additions (<a6d74b)" && nonuser_patcher
 	    else
@@ -1933,7 +1949,11 @@ EOM
 
   # Joshua Ashton's take on making wine dialogs and menus less win95-ish - https://github.com/Joshua-Ashton/wine/tree/wine-better-theme
   if [ "$_use_josh_flat_theme" = "true" ]; then
-    _patchname='josh-flat-theme.patch' && _patchmsg="Add Josh's better-theme" && nonuser_patcher
+    #if git merge-base --is-ancestor 6456973f0a64d326bb54da4675310caffc2588f1 HEAD; then
+    #  _patchname='josh-flat-theme.patch' && _patchmsg="Add Josh's better-theme" && nonuser_patcher
+    #else
+      _patchname='josh-flat-theme-6456973.patch' && _patchmsg="Add Josh's better-theme" && nonuser_patcher
+    #fi
   fi
 
 	# Set the default wine version to win10
