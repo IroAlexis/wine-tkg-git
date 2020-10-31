@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.20.r11.gc811f7aa
+pkgver=5.20.r14.gf7739e70
 pkgrel=1
 _frogwhere="$PWD"
 # Arch chroot workaround
@@ -210,7 +210,7 @@ package() {
 
   mkdir -p tmpdist
   mkdir -p dist
-  tar -xf proton_dist.tar.gz -C tmpdist
+  tar -xf proton_dist.tar.gz -C tmpdist && rm proton_dist.tar.gz
 
   # deps
   cd tmpdist
