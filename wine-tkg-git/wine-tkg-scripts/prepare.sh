@@ -1498,7 +1498,7 @@ EOM
 	fi
 
 	# Magic The Gathering: Arena crash fix - (>aa0c4bb5e72caf290b6588bc1f9931cc89a9feb6)
-	if [ "$_mtga_fix" = "true" ] && git merge-base --is-ancestor aa0c4bb5e72caf290b6588bc1f9931cc89a9feb6 HEAD; then
+	if [ "$_mtga_fix" = "true" ] && git merge-base --is-ancestor aa0c4bb5e72caf290b6588bc1f9931cc89a9feb6 HEAD && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD; then
 	  if git merge-base --is-ancestor c3fac6e36caab168974dd04a60ae1bbb1a0fd919 HEAD; then
 	    if [ "$_use_staging" = "true" ]; then
 	      _patchname='mtga-staging.patch' && _patchmsg="Applied MTGA crashfix" && nonuser_patcher
@@ -1516,8 +1516,10 @@ EOM
 
 	# Workarounds to prevent crashes on some mf functions
 	if [ "$_use_staging" = "true" ] && [ "$_proton_mf_hacks" = "true" ] && git merge-base --is-ancestor b182ba882cfcce7b8769470f49f0fba216095c45 HEAD; then
-	  if git merge-base --is-ancestor f540d1615fe66c95a3824e86e5292a026511749e HEAD; then
+	  if git merge-base --is-ancestor e308d81a617632fe0fedd243952f79e8d9ec05b4 HEAD; then
 	    _patchname='proton_mf_hacks.patch' && _patchmsg="Applied proton mf hacks patch" && nonuser_patcher
+	  elif git merge-base --is-ancestor f540d1615fe66c95a3824e86e5292a026511749e HEAD; then
+	    _patchname='proton_mf_hacks-e308d81.patch' && _patchmsg="Applied proton mf hacks patch" && nonuser_patcher
 	  elif git merge-base --is-ancestor 120505ed6b590daea11486a512dd563600d0329f HEAD; then
 	    _patchname='proton_mf_hacks-f540d16.patch' && _patchmsg="Applied proton mf hacks patch" && nonuser_patcher
 	  elif git merge-base --is-ancestor 7c5fcfffe7b3a001c980f19cb6ed1cee049c26c8 HEAD; then
@@ -1946,14 +1948,14 @@ EOM
 	  _patchname='proton_fs_hack_integer_scaling.patch' && _patchmsg="Enable Proton fs hack integer scaling" && nonuser_patcher
 	fi
 	if [ "$_update_winevulkan" = "true" ] && git merge-base --is-ancestor 7e736b5903d3d078bbf7bb6a509536a942f6b9a0 HEAD; then
-	  if git merge-base --is-ancestor bff6bc6a79ffc3a915219a6dfe64c9bcabaaeceb HEAD; then
+	  if git merge-base --is-ancestor fc893489fe89c9fbd22f0cbe1c4327c64f05e0dc HEAD; then
 	    if [ "$_proton_fs_hack" = "true" ]; then
 	      _patchname='proton-winevulkan.patch' && _patchmsg="Using Proton winevulkan patches" && nonuser_patcher
 	    else
 	      _patchname='proton-winevulkan-nofshack.patch' && _patchmsg="Using Proton winevulkan patches (nofshack)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor 1e074c39f635c585595e9f3ece99aa290a7f9cf8 HEAD; then
+	    if git merge-base --is-ancestor bff6bc6a79ffc3a915219a6dfe64c9bcabaaeceb HEAD; then
 	      _lastcommit="fc89348"
 	    elif git merge-base --is-ancestor 1e074c39f635c585595e9f3ece99aa290a7f9cf8 HEAD; then
 	      _lastcommit="bff6bc6"
