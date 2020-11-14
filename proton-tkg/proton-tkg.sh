@@ -279,16 +279,12 @@ proton_patcher() {
 	  if [[ "$_CONDITION" =~ [yY] ]] || [ "$_user_patches_no_confirm" = "true" ]; then
 	    for _f in ${_patches[@]}; do
 	      if [ -e "${_f}" ]; then
-	        if [[ "${_f}" = */3886.myprotonpatch ]] && [ "$_proton_branch" != "proton_5.0" ]; then
-	          echo "Skipping 3886.myprotonpatch as it only applies to proton_5.0 branch"
-	        else
-	          echo "######################################################"
-	          echo ""
-	          echo "Applying your own ${_userpatch_target} patch ${_f}"
-	          echo ""
-	          echo "######################################################"
-	          patch -Np1 < "${_f}"
-	        fi
+	        echo "######################################################"
+	        echo ""
+	        echo "Applying your own ${_userpatch_target} patch ${_f}"
+	        echo ""
+	        echo "######################################################"
+	        patch -Np1 < "${_f}"
 	      fi
 	    done
 	  fi
@@ -651,26 +647,26 @@ else
     # Patch our proton script to make use of the steam helper on 4.0+
     if [[ $_proton_branch != proton_3.* ]] && [ "$_proton_use_steamhelper" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/steam.exe.patch" && rm -f proton.orig
+      patch -Np1 < "$_nowhere/proton_template/steam.exe.patch" || exit 1
       cd "$_nowhere"
     fi
 
     # Patch our proton script to allow for VR support
     if [ "$_steamvr_support" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/vr-support.patch" && rm -f proton.orig
+      patch -Np1 < "$_nowhere/proton_template/vr-support.patch" || exit 1
       cd "$_nowhere"
     fi
 
     # Patch our proton script to handle minimal d3d10 implementation for dxvk on Wine 5.3+
     if [ "$_dxvk_minimald3d10" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/dxvk_minimald3d10.patch" && rm -f proton.orig
+      patch -Np1 < "$_nowhere/proton_template/dxvk_minimald3d10.patch" || exit 1
       cd "$_nowhere"
       # Patch our proton script to handle dxvk_config lib
       if [ -e "$_nowhere"/dxvk/x64/dxvk_config.dll ]; then
         cd "$_nowhere/proton_tkg_$_protontkg_version"
-        patch -Np1 < "$_nowhere/proton_template/dxvk_config_support.patch" && rm -f proton.orig
+        patch -Np1 < "$_nowhere/proton_template/dxvk_config_support.patch" || exit 1
         cd "$_nowhere"
       fi
     fi
@@ -678,7 +674,7 @@ else
     # Patch our makepkg version of the proton script to not create default prefix and use /tmp/dist.lock
     if [ "$_ispkgbuild" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/makepkg_adjustments.patch" && rm -f proton.orig
+      patch -Np1 < "$_nowhere/proton_template/makepkg_adjustments.patch" || exit 1
       cd "$_nowhere"
     fi
 
@@ -686,6 +682,8 @@ else
     if [ "$_proton_mf_hacks" != "true" ]; then
       sed -i '/.*#disable built-in mfplay.*/d' "proton_tkg_$_protontkg_version/proton"
     fi
+
+    rm -f "$_nowhere/proton_tkg_$_protontkg_version/proton.orig"
 
     # Set Proton-tkg user_settings.py defaults
     if [ "$_proton_nvapi_disable" = "true" ]; then
@@ -697,6 +695,11 @@ else
       sed -i 's/.*PROTON_WINEDBG_DISABLE.*/     "PROTON_WINEDBG_DISABLE": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
     else
       sed -i 's/.*PROTON_WINEDBG_DISABLE.*/#     "PROTON_WINEDBG_DISABLE": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
+    fi
+    if [ "$_proton_conhost_disable" = "true" ]; then
+      sed -i 's/.*PROTON_CONHOST_DISABLE.*/     "PROTON_CONHOST_DISABLE": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
+    else
+      sed -i 's/.*PROTON_CONHOST_DISABLE.*/#     "PROTON_CONHOST_DISABLE": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
     fi
     if [ "$_proton_force_LAA" = "true" ]; then
       sed -i 's/.*PROTON_DISABLE_LARGE_ADDRESS_AWARE.*/#     "PROTON_DISABLE_LARGE_ADDRESS_AWARE": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"

@@ -529,7 +529,7 @@ _prepare() {
 
 	echo "" >> "$_where"/last_build_config.log
 
-	if [ "$_mtga_fix" = "true" ] && git merge-base --is-ancestor e5a9c256ce08868f65ed730c00cf016a97369ce3 HEAD; then
+	if [ "$_mtga_fix" = "true" ] && git merge-base --is-ancestor e5a9c256ce08868f65ed730c00cf016a97369ce3 HEAD && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD; then
 	  _committorevert=341068aa61a71afecb712feda9aabb3dc1c3ab5f && nonuser_reverter
 	  _committorevert=e5a9c256ce08868f65ed730c00cf016a97369ce3 && nonuser_reverter
 	  echo -e "( MTGA bandaid reverts applied )\n" >> "$_where"/last_build_config.log
@@ -767,12 +767,9 @@ _prepare() {
 	    cd "${srcdir}"/"${_stgsrcdir}" && _patchname='staging-44d1a45-localreverts.patch' _patchmsg="Applied local reverts for staging 44d1a45 proton-nofshack" nonuser_patcher && cd "${srcdir}"/"${_winesrcdir}"
 	  fi
 	fi
-	if [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" != "true" ] && [ "$_use_staging" = "true" ] && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
-	    _staging_args+=(-W dinput-remap-joystick -W dinput-reconnect-joystick -W dinput-axis-recalc)
-	fi
 
 	# Disable some staging patchsets to prevent bad interactions with proton gamepad additions
-	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_gamepad_additions" = "true" ]; then
+	if ( ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD && [ "$_gamepad_additions" = "true" ] ) || ( git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD && [ "$_sdl_joy_support" = "true" ] ) && ( [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_use_staging" = "true" ] ); then
 	  _staging_args+=(-W dinput-SetActionMap-genre -W dinput-axis-recalc -W dinput-joy-mappings -W dinput-reconnect-joystick -W dinput-remap-joystick)
 	fi
 
@@ -1483,10 +1480,6 @@ EOM
 	      _patchname='0002-winex11-Fix-more-key-translation.patch' && _patchmsg="Applied proton friendly winex11-Fix-more-key-translation" && nonuser_patcher
 	      _patchname='0003-winex11.drv-Fix-main-Russian-keyboard-layout.patch' && _patchmsg="Applied proton friendly winex11.drv-Fix-main-Russian-keyboard-layout" && nonuser_patcher
 	  fi
-	elif [ "$_proton_rawinput" = "true" ] && [ "$_proton_fs_hack" != "true" ] && [ "$_use_staging" = "true" ] && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
-	  if git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
-	    _patchname='proton-rawinput-nofshack.patch' && _patchmsg="Using rawinput nofshack patchset" && nonuser_patcher
-	  fi
 	fi
 
 	# Update winevulkan
@@ -1640,8 +1633,10 @@ EOM
 	      fi
 	      _patchname='proton-tkg-staging.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 2/3" && nonuser_patcher
 	      if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
-	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7caa127746fd880a263715879c9931fa67053fe0 HEAD ); then
 	          _patchname='proton-steam-bits.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
+	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	          _patchname='proton-steam-bits-7caa127.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	          _patchname='proton-steam-bits-7e51cc8.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif git merge-base --is-ancestor 9122bc1096f3231c5f6b8ffc0d7ad3e700f18af1 HEAD; then
@@ -1669,8 +1664,10 @@ EOM
 	      fi
 	      _patchname='proton-tkg.patch' && _patchmsg="Using Steam-specific Proton-tkg patches 2/3" && nonuser_patcher
 	      if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
-	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7caa127746fd880a263715879c9931fa67053fe0 HEAD ); then
 	          _patchname='proton-steam-bits.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
+	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	          _patchname='proton-steam-bits-7caa127.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	          _patchname='proton-steam-bits-7e51cc8.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif git merge-base --is-ancestor 9122bc1096f3231c5f6b8ffc0d7ad3e700f18af1 HEAD; then
@@ -1816,8 +1813,10 @@ EOM
 	      fi
 	      _patchname="proton-tkg-staging-$_lastcommit.patch" && _patchmsg="Using Steam-specific Proton-tkg patches (staging-$_lastcommit) 2/2" && nonuser_patcher
 	      if [ "$_stmbits" = "1" ] && [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
-	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7caa127746fd880a263715879c9931fa67053fe0 HEAD ); then
 	          _patchname='proton-steam-bits.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
+	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	          _patchname='proton-steam-bits-7caa127.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	          _patchname='proton-steam-bits-7e51cc8.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif git merge-base --is-ancestor 9122bc1096f3231c5f6b8ffc0d7ad3e700f18af1 HEAD; then
@@ -1845,8 +1844,10 @@ EOM
 	      fi
 	      _patchname="proton-tkg-$_lastcommit.patch" && _patchmsg="Using Steam-specific Proton-tkg patches ($_lastcommit) 2/2" && nonuser_patcher
 	      if [ "$_stmbits" = "1" ] && [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
-	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	        if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7caa127746fd880a263715879c9931fa67053fe0 HEAD ); then
 	          _patchname='proton-steam-bits.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
+	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7e51cc8308bd828d8d8a90aea35170c68d4b1bb4 HEAD ); then
+	          _patchname='proton-steam-bits-7caa127.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	          _patchname='proton-steam-bits-7e51cc8.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 3/3" && nonuser_patcher
 	        elif git merge-base --is-ancestor 9122bc1096f3231c5f6b8ffc0d7ad3e700f18af1 HEAD; then
@@ -1876,9 +1877,11 @@ EOM
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
 	  # SDL Joystick support - from Proton
-	  if ( [ "$_sdl_joy_support" = "true" ] && cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ) || ( [ "$_sdl_joy_support" = "true" ] && [ "$_proton_rawinput" != "true" ] && cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ); then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
+	  if [ "$_sdl_joy_support" = "true" ]; then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ); then
 	      _patchname='proton-sdl-joy.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
+	      _patchname='proton-sdl-joy-6373792.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
 	      _patchname='proton-sdl-joy-0c249e6.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
 	    elif git merge-base --is-ancestor b87256cd1db21a59484248a193b6ad12ca2853ca HEAD; then
@@ -1886,11 +1889,11 @@ EOM
 	    else
 	      _patchname='proton-sdl-joy-b87256c.patch' && _patchmsg="Enable SDL Joystick support (from Proton) (<b87256c)" && nonuser_patcher
 	    fi
-	    if git merge-base --is-ancestor 1daeef73325e9d35073231baf874600050126c7f HEAD; then
+	    if ( git merge-base --is-ancestor 1daeef73325e9d35073231baf874600050126c7f HEAD && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ); then
 	      _patchname='proton-sdl-joy-2.patch' && _patchmsg="Enable SDL Joystick support additions (from Proton)" && nonuser_patcher
 	    fi
 	    # Gamepad additions - from Proton
-	    if [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ]; then
+	    if ( [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ] && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ); then
 	      if git merge-base --is-ancestor 6cb3d0fb3778f660546e581787b1734e2b1d2955 HEAD; then
 	        _patchname='proton-gamepad-additions.patch' && _patchmsg="Enable xinput hacks and other gamepad additions (from Proton)" && nonuser_patcher
 	      elif git merge-base --is-ancestor c074966b9d75d9519e8640e87725ad439f4ffa0c HEAD; then
@@ -2124,9 +2127,21 @@ _polish() {
 	tools/make_requests
 	autoreconf -f
 
-	if [ -z "$_localbuild" ]; then
+	# The versioning string has moved with 1dd3051cca5cafe90ce44460731df61abb680b3b
+	# Since this is reverted by the hotfixer path, only use the new path on 0c249e6+ (deprecation of the hotfixer path)
+	if ( cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
+	  _versioning_path="${srcdir}/${_winesrcdir}/libs/wine/Makefile.in"
+	  _versioning_string="top_srcdir"
+	else
+	  _versioning_path="${srcdir}/${_winesrcdir}/Makefile.in"
+	  _versioning_string="srcdir"
+	fi
+
+	if [ -n "$_localbuild" ] && [ -n "$_localbuild_versionoverride" ]; then
+	  sed -i "s/GIT_DIR=\$($_versioning_string)\\/.git git describe HEAD 2>\\/dev\\/null || echo \"wine-\$(PACKAGE_VERSION)\"/echo \"wine-$_localbuild_versionoverride\"/g" "$_versioning_path"
+	elif [ -z "$_localbuild" ]; then
 	  # Set custom version so that it reports the same as pkgver
-	  sed -i "s/GIT_DIR=\$(top_srcdir)\\/.git git describe HEAD 2>\\/dev\\/null || echo \"wine-\$(PACKAGE_VERSION)\"/echo \"wine-$_realwineversion\"/g" "${srcdir}"/"${_winesrcdir}"/libs/wine/Makefile.in
+	  sed -i "s/GIT_DIR=\$($_versioning_string)\\/.git git describe HEAD 2>\\/dev\\/null || echo \"wine-\$(PACKAGE_VERSION)\"/echo \"wine-$_realwineversion\"/g" "$_versioning_path"
 
 	  # Set custom version tags
 	  local _version_tags=()
