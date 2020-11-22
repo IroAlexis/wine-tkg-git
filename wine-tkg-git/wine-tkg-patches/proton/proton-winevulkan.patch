@@ -376,7 +376,7 @@ index 82d0c3a0a5e..8da14348c18 100644
  PFN_vkVoidFunction WINAPI wine_vkGetDeviceProcAddr(VkDevice device, const char *pName);
  void WINAPI wine_vkGetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue *pQueue);
  void WINAPI wine_vkGetDeviceQueue2(VkDevice device, const VkDeviceQueueInfo2 *pQueueInfo, VkQueue *pQueue);
-@@ -67,21 +70,26 @@ void WINAPI wine_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice
+@@ -67,26 +70,31 @@ void WINAPI wine_vkGetPhysicalDeviceExternalSemaphoreProperties(VkPhysicalDevice
  VkResult WINAPI wine_vkGetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo, VkImageFormatProperties2 *pImageFormatProperties);
  VkResult WINAPI wine_vkGetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo, VkImageFormatProperties2 *pImageFormatProperties) DECLSPEC_HIDDEN;
  VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities);
@@ -390,10 +390,15 @@ index 82d0c3a0a5e..8da14348c18 100644
  VkResult WINAPI wine_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities);
  void WINAPI wine_vkGetPrivateDataEXT(VkDevice device, VkObjectType objectType, uint64_t objectHandle, VkPrivateDataSlotEXT privateDataSlot, uint64_t *pData) DECLSPEC_HIDDEN;
  VkResult WINAPI wine_vkQueueSubmit(VkQueue queue, uint32_t submitCount, const VkSubmitInfo *pSubmits, VkFence fence);
+ VkResult WINAPI wine_vkSetDebugUtilsObjectNameEXT(VkDevice device, const VkDebugUtilsObjectNameInfoEXT *pNameInfo) DECLSPEC_HIDDEN;
+ VkResult WINAPI wine_vkSetDebugUtilsObjectTagEXT(VkDevice device, const VkDebugUtilsObjectTagInfoEXT *pTagInfo) DECLSPEC_HIDDEN;
  VkResult WINAPI wine_vkSetPrivateDataEXT(VkDevice device, VkObjectType objectType, uint64_t objectHandle, VkPrivateDataSlotEXT privateDataSlot, uint64_t data) DECLSPEC_HIDDEN;
+ void WINAPI wine_vkSubmitDebugUtilsMessageEXT(VkInstance instance, VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT messageTypes, const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData) DECLSPEC_HIDDEN;
 +VkResult WINAPI wine_vkReleaseFullScreenExclusiveModeEXT(VkDevice device, VkSwapchainKHR swapchain) DECLSPEC_HIDDEN;
  
  /* Private thunks */
+ VkResult thunk_vkDebugMarkerSetObjectNameEXT(VkDevice device, const VkDebugMarkerObjectNameInfoEXT *pNameInfo) DECLSPEC_HIDDEN;
+ VkResult thunk_vkDebugMarkerSetObjectTagEXT(VkDevice device, const VkDebugMarkerObjectTagInfoEXT *pTagInfo) DECLSPEC_HIDDEN;
 +VkResult thunk_vkGetDeviceGroupSurfacePresentModesKHR(VkDevice device, VkSurfaceKHR surface, VkDeviceGroupPresentModeFlagsKHR *pModes) DECLSPEC_HIDDEN;
  VkResult thunk_vkGetPhysicalDeviceImageFormatProperties2(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo, VkImageFormatProperties2 *pImageFormatProperties) DECLSPEC_HIDDEN;
  VkResult thunk_vkGetPhysicalDeviceImageFormatProperties2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceImageFormatInfo2 *pImageFormatInfo, VkImageFormatProperties2 *pImageFormatProperties) DECLSPEC_HIDDEN;
@@ -402,7 +407,7 @@ index 82d0c3a0a5e..8da14348c18 100644
 +VkResult thunk_vkGetPhysicalDeviceSurfacePresentModesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, uint32_t *pPresentModeCount, VkPresentModeKHR *pPresentModes) DECLSPEC_HIDDEN;
  VkResult thunk_vkGetPhysicalDeviceSurfaceCapabilities2KHR(VkPhysicalDevice physicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *pSurfaceInfo, VkSurfaceCapabilities2KHR *pSurfaceCapabilities) DECLSPEC_HIDDEN;
  VkResult thunk_vkGetPhysicalDeviceSurfaceCapabilitiesKHR(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface, VkSurfaceCapabilitiesKHR *pSurfaceCapabilities) DECLSPEC_HIDDEN;
- 
+ VkResult thunk_vkSetDebugUtilsObjectNameEXT(VkDevice device, const VkDebugUtilsObjectNameInfoEXT *pNameInfo) DECLSPEC_HIDDEN;
 @@ -528,6 +540,13 @@ typedef struct VkMemoryRequirements2_host
      VkMemoryRequirements_host memoryRequirements;
  } VkMemoryRequirements2_host;
@@ -445,7 +450,7 @@ index 82d0c3a0a5e..8da14348c18 100644
      VkResult (*p_vkReleasePerformanceConfigurationINTEL)(VkDevice, VkPerformanceConfigurationINTEL);
      VkResult (*p_vkResetCommandBuffer)(VkCommandBuffer, VkCommandBufferResetFlags);
      VkResult (*p_vkResetCommandPool)(VkDevice, VkCommandPool, VkCommandPoolResetFlags);
-@@ -1332,13 +1358,19 @@ struct vulkan_instance_funcs
+@@ -1332,18 +1358,24 @@ struct vulkan_instance_funcs
      VkResult (*p_vkGetPhysicalDeviceSurfaceFormats2KHR)(VkPhysicalDevice, const VkPhysicalDeviceSurfaceInfo2KHR *, uint32_t *, VkSurfaceFormat2KHR *);
  #endif
      VkResult (*p_vkGetPhysicalDeviceSurfaceFormatsKHR)(VkPhysicalDevice, VkSurfaceKHR, uint32_t *, VkSurfaceFormatKHR *);
@@ -458,6 +463,11 @@ index 82d0c3a0a5e..8da14348c18 100644
      VkResult (*p_vkGetPhysicalDeviceSurfaceSupportKHR)(VkPhysicalDevice, uint32_t, VkSurfaceKHR, VkBool32 *);
      VkResult (*p_vkGetPhysicalDeviceToolPropertiesEXT)(VkPhysicalDevice, uint32_t *, VkPhysicalDeviceToolPropertiesEXT *);
      VkBool32 (*p_vkGetPhysicalDeviceWin32PresentationSupportKHR)(VkPhysicalDevice, uint32_t);
+ #if defined(USE_STRUCT_CONVERSION)
+     void (*p_vkSubmitDebugUtilsMessageEXT)(VkInstance, VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT_host *);
+ #else
+     void (*p_vkSubmitDebugUtilsMessageEXT)(VkInstance, VkDebugUtilsMessageSeverityFlagBitsEXT, VkDebugUtilsMessageTypeFlagsEXT, const VkDebugUtilsMessengerCallbackDataEXT *);
+ #endif
  };
  
  #define ALL_VK_DEVICE_FUNCS() \
@@ -1112,3 +1122,42 @@ index 14574e198f5..141c2ca17f6 100644
          pXRRFreeProviderInfo( provider_info );
      }
  
+From 252d6abc7b52a5f506c7fc621c4469d7fd0252f7 Mon Sep 17 00:00:00 2001
+From: Paul Gofman <pgofman@codeweavers.com>
+Date: Fri, 23 Oct 2020 17:11:18 +0300
+Subject: [PATCH] winevulkan: HACK: Set default mxcsr for
+ vkEnumeratePhysicalDevices() call.
+
+Workaround Killer Instinct crash on start with AMD GPU.
+---
+ dlls/winevulkan/vulkan.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/dlls/winevulkan/vulkan.c b/dlls/winevulkan/vulkan.c
+index 6e2a5b01359..ca080798f64 100644
+--- a/dlls/winevulkan/vulkan.c
++++ b/dlls/winevulkan/vulkan.c
+@@ -650,6 +650,7 @@ VkResult WINAPI wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
+ {
+     VkInstanceCreateInfo create_info_host;
+     const VkApplicationInfo *app_info;
++    uint32_t new_mxcsr, old_mxcsr;
+     struct VkInstance_T *object;
+     VkResult res;
+ 
+@@ -694,7 +695,12 @@ VkResult WINAPI wine_vkCreateInstance(const VkInstanceCreateInfo *create_info,
+      * the native physical devices and present those to the application.
+      * Cleanup happens as part of wine_vkDestroyInstance.
+      */
++    __asm__ volatile("stmxcsr %0" : "=m"(old_mxcsr));
++    new_mxcsr = 0x1f80;
++    __asm__ volatile("ldmxcsr %0" : : "m"(new_mxcsr));
+     res = wine_vk_instance_load_physical_devices(object);
++    __asm__ volatile("ldmxcsr %0" : : "m"(old_mxcsr));
++    TRACE("old_mxcsr %#x.\n", old_mxcsr);
+     if (res != VK_SUCCESS)
+     {
+         ERR("Failed to load physical devices, res=%d\n", res);
+-- 
+2.26.2
+

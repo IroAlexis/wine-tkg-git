@@ -1,10 +1,13 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=5.17.2.r3.g151728b0
+pkgver=5.22.r0.g371d6ff6
 pkgrel=1
 _frogwhere="$PWD"
-export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
+# Arch chroot workaround
+if [[ "${_frogwhere}" != "/startdir" ]]; then
+  export BUILDDIR="${_frogwhere}" # Override makepkg BUILDDIR path and use PKGBUILDs dirs instead
+fi
 arch=('x86_64')
 pkgdesc='Custom Proton build with even more frog spice'
 url='https://github.com/Tk-Glitch/PKGBUILDS/tree/master/proton-tkg'
@@ -64,6 +67,7 @@ makedepends=(
     'glslang'               'wget'
     'ocl-icd'               'lib32-ocl-icd'
     'opencl-headers'        'mingw-w64-gcc'
+    'vulkan-headers'
     $_user_makedeps
 )
 optdepends=(
@@ -109,9 +113,29 @@ recursive_installer() {
 }
 
 pkgver() {
-  warning "This step might take some time, please be patient..."
+  cd "${_frogwhere}/../wine-tkg-git/${_pkgvertargdir}"
+
+  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g;s/^v//;s/\.rc/rc/;s/^wine\.//'
+}
+
+prepare() {
+  # Arch chroot workaround
+  if [[ "${_frogwhere}" = "/startdir" ]]; then
+    msg2 "Arch chroot detected!"
+    export _frogwhere=/build/proton-tkg-git
+    git clone https://github.com/Frogging-Family/wine-tkg-git.git || true
+    if [ -d wine-tkg-git/wine-tkg-git ]; then
+      mv wine-tkg-git/wine-tkg-git /build/wine-tkg-git
+    fi
+    if [ -d wine-tkg-git/proton-tkg ]; then
+      mv wine-tkg-git/proton-tkg/* /build/proton-tkg-git/
+    fi
+  fi
 
   # overcomplicated BS
+  _srcdirlock="${_frogwhere}/../wine-tkg-git"
+
+  warning "The next step might take some time, please be patient..."
   source "${_frogwhere}"/proton-tkg.cfg
   source "${_frogwhere}"/proton-tkg-profiles/advanced-customization.cfg
   if [ -e "$_EXT_CONFIG_PATH" ]; then
@@ -132,25 +156,23 @@ pkgver() {
     fi
   fi
 
-  cd "${_frogwhere}/../wine-tkg-git"
+  cd "${_srcdirlock}"
+  _pkgvertargdir="${_winesrcdir}"
   # Empty clone failsafe
-  git clone --mirror "${_winesrctarget}" "$_winesrcdir" >/dev/null 2>&1 || true
-  _srcdirlock=$PWD
+  git clone --mirror "${_winesrctarget}" "$_winesrcdir" || true
 
   if [ "$_use_staging" = "true" ]; then
     _stgsrcdir='wine-staging-git'
-    # Empty clone failsafe
-    git clone --mirror https://github.com/wine-staging/wine-staging.git "$_stgsrcdir" >/dev/null 2>&1 || true
     _pkgvertargdir="${_stgsrcdir}"
-  else
-    _pkgvertargdir="${_winesrcdir}"
+    # Empty clone failsafe
+    git clone --mirror https://github.com/wine-staging/wine-staging.git "$_stgsrcdir" || true
   fi
 
   cd "${_srcdirlock}/${_pkgvertargdir}"
   git fetch --all -p >/dev/null 2>&1
   rm -rf "${_srcdirlock}/src/${_pkgvertargdir}" && git clone "${_srcdirlock}/${_pkgvertargdir}" "${_srcdirlock}/src/${_pkgvertargdir}" >/dev/null 2>&1
   cd "${_srcdirlock}/src/${_pkgvertargdir}"
-  git checkout --force --no-track -B makepkg origin/HEAD >/dev/null 2>&1
+  git checkout --force --no-track -B makepkg origin/HEAD
   if [ -n "$_plain_version" ] && [ "$_use_staging" != "true" ]; then
     git checkout "${_plain_version}"
   fi
@@ -158,10 +180,6 @@ pkgver() {
     git checkout "${_staging_version}"
   fi
 
-  git describe --long --tags | sed 's/\([^-]*-g\)/r\1/;s/-/./g;s/^v//;s/\.rc/rc/;s/^wine\.//'
-}
-
-prepare() {
   cd "${_frogwhere}"
   if [ ! -d "${_frogwhere}/external-ressources" ]; then
     mkdir -p "${_frogwhere}/external-ressources"
@@ -192,7 +210,7 @@ package() {
 
   mkdir -p tmpdist
   mkdir -p dist
-  tar -xf proton_dist.tar.gz -C tmpdist
+  tar -xf proton_dist.tar.gz -C tmpdist && rm proton_dist.tar.gz
 
   # deps
   cd tmpdist
