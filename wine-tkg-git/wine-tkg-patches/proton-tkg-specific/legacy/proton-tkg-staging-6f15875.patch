@@ -622,6 +622,66 @@ index 6344157f384..6fefe5d6d80 100644
      if (rounded_size < size) goto oom;  /* overflow */
      if (rounded_size < HEAP_MIN_DATA_SIZE) rounded_size = HEAP_MIN_DATA_SIZE;
  
+From 33cd3de313071c787bece5acc31351c36abd74e9 Mon Sep 17 00:00:00 2001
+From: Brendan Shanks <bshanks@codeweavers.com>
+Date: Tue, 22 Oct 2019 16:27:51 -0700
+Subject: [PATCH] HACK: ntdll: Run WT_EXECUTEINWAITTHREAD wait callbacks
+ serially.
+
+On Windows, waits registered with the WT_EXECUTEINWAITTHREAD flag will
+often have their callbacks run serially (since they're all handled by
+the same wait thread). Running them in parallel can expose race
+conditions.
+Use a process-wide critical section to serialize these callbacks.
+
+Wine-Bug: https://bugs.winehq.org/show_bug.cgi?id=47843
+---
+ dlls/ntdll/threadpool.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/dlls/ntdll/threadpool.c b/dlls/ntdll/threadpool.c
+index 639e032f629..dbd9577d6bc 100644
+--- a/dlls/ntdll/threadpool.c
++++ b/dlls/ntdll/threadpool.c
+@@ -84,6 +84,17 @@ struct wait_work_item
+     int CallbackInProgress;
+ };
+ 
++static RTL_CRITICAL_SECTION_DEBUG wait_thread_executeinwaitthread_cs_debug;
++
++static RTL_CRITICAL_SECTION wait_thread_executeinwaitthread_cs = {&wait_thread_executeinwaitthread_cs_debug, -1, 0, 0, 0, 0};
++
++static RTL_CRITICAL_SECTION_DEBUG wait_thread_executeinwaitthread_cs_debug =
++{
++    0, 0, &wait_thread_executeinwaitthread_cs,
++    { &wait_thread_executeinwaitthread_cs_debug.ProcessLocksList, &wait_thread_executeinwaitthread_cs_debug.ProcessLocksList },
++      0, 0, { (DWORD_PTR)(__FILE__ ": wait_thread_executeinwaitthread_cs") }
++};
++
+ struct timer_queue;
+ struct queue_timer
+ {
+@@ -527,7 +538,20 @@ static DWORD CALLBACK wait_thread_proc(LPVOID Arg)
+                 TRACE( "Work has been canceled.\n" );
+                 break;
+             }
++
++            /* HACK: On Windows, waits created with WT_EXECUTEINWAITTHREAD often end up on the same wait thread
++             * and run serialized. Running these waits simultaneously on separate threads may expose race conditions
++             * not seen on Windows.
++             * Use a critical section to ensure these callbacks run serially.
++             */
++            if (wait_work_item->Flags & WT_EXECUTEINWAITTHREAD)
++                enter_critical_section(&wait_thread_executeinwaitthread_cs);
++
+             wait_work_item->Callback( wait_work_item->Context, TimerOrWaitFired );
++
++            if (wait_work_item->Flags & WT_EXECUTEINWAITTHREAD)
++                leave_critical_section(&wait_thread_executeinwaitthread_cs);
++
+             InterlockedExchange( &wait_work_item->CallbackInProgress, FALSE );
+ 
+             if (wait_work_item->Flags & WT_EXECUTEONLYONCE)
 From 5cd65deffffad9073538acf4fd8e794ac07824a5 Mon Sep 17 00:00:00 2001
 From: =?UTF-8?q?R=C3=A9mi=20Bernon?= <rbernon@codeweavers.com>
 Date: Wed, 9 Oct 2019 09:47:12 +0200
@@ -1299,83 +1359,6 @@ index a5235b69a8d..4b2c9bd41ae 100644
          /* forward request to the foreground window if it's in a different thread */
          tid = GetWindowThreadProcessId( foreground, &pid );
          if (tid && tid != GetCurrentThreadId() && pid == GetCurrentProcessId())
-From 4dbaef46678173fc63b833d24d2e63bc03b24c59 Mon Sep 17 00:00:00 2001
-From: Piotr Caban <piotr@codeweavers.com>
-Date: Wed, 4 Mar 2020 18:49:37 +0100
-Subject: [PATCH] HACK: ntdll: Mark first gta5.exe page as copied.
-
----
- dlls/ntdll/unix/virtual.c | 29 +++++++++++++++++++++++++++--
- 1 file changed, 27 insertions(+), 2 deletions(-)
-
-diff --git a/dlls/ntdll/unix/virtual.c b/dlls/ntdll/unix/virtual.c
-index fbb26d65046..7ea80852090 100644
---- a/dlls/ntdll/unix/virtual.c
-+++ b/dlls/ntdll/unix/virtual.c
-@@ -62,6 +62,7 @@
- #include "wine/rbtree.h"
- #include "unix_private.h"
- #include "wine/debug.h"
-+#include "wine/unicode.h"
- 
- WINE_DEFAULT_DEBUG_CHANNEL(virtual);
- WINE_DECLARE_DEBUG_CHANNEL(module);
-@@ -97,6 +98,7 @@ struct file_view
- #define VPROT_GUARD      0x10
- #define VPROT_COMMITTED  0x20
- #define VPROT_WRITEWATCH 0x40
-+#define VPROT_COPIED     0x80
- /* per-mapping protection flags */
- #define VPROT_SYSTEM     0x0200  /* system view (underlying mmap not under our control) */
- 
-@@ -782,7 +784,8 @@ static const char *get_prot_str( BYTE prot )
-     buffer[0] = (prot & VPROT_COMMITTED) ? 'c' : '-';
-     buffer[1] = (prot & VPROT_GUARD) ? 'g' : ((prot & VPROT_WRITEWATCH) ? 'H' : '-');
-     buffer[2] = (prot & VPROT_READ) ? 'r' : '-';
--    buffer[3] = (prot & VPROT_WRITECOPY) ? 'W' : ((prot & VPROT_WRITE) ? 'w' : '-');
-+    buffer[3] = (prot & VPROT_WRITECOPY) ? (prot & VPROT_COPIED ? 'w' : 'W')
-+        : ((prot & VPROT_WRITE) ? 'w' : '-');
-     buffer[4] = (prot & VPROT_EXEC) ? 'x' : '-';
-     buffer[5] = 0;
-     return buffer;
-@@ -1380,7 +1383,11 @@ static NTSTATUS create_view( struct file_view **view_ret, void *base, size_t siz
-  */
- static DWORD get_win32_prot( BYTE vprot, unsigned int map_prot )
- {
--    DWORD ret = VIRTUAL_Win32Flags[vprot & 0x0f];
-+    DWORD ret;
-+
-+    if ((vprot & (VPROT_COPIED | VPROT_WRITECOPY)) == (VPROT_COPIED | VPROT_WRITECOPY))
-+        vprot = (vprot & ~VPROT_WRITECOPY) | VPROT_WRITE;
-+    ret = VIRTUAL_Win32Flags[vprot & 0x0f];
-     if (vprot & VPROT_GUARD) ret |= PAGE_GUARD;
-     if (map_prot & SEC_NOCACHE) ret |= PAGE_NOCACHE;
-     return ret;
-@@ -3674,6 +3681,24 @@ NTSTATUS WINAPI NtProtectVirtualMemory( HANDLE process, PVOID *addr_ptr, SIZE_T
-         {
-             old = get_win32_prot( vprot, view->protect );
-             status = set_protection( view, base, size, new_prot );
-+
-+            /* GTA5 HACK: Mark first page as copied. */
-+            if (status == STATUS_SUCCESS && (view->protect & SEC_IMAGE) &&
-+                    base == (void*)NtCurrentTeb()->Peb->ImageBaseAddress)
-+            {
-+                const WCHAR gta5W[] = { 'g','t','a','5','.','e','x','e',0 };
-+                WCHAR *name, *p;
-+
-+                name = NtCurrentTeb()->Peb->ProcessParameters->ImagePathName.Buffer;
-+                p = strrchrW(name, '\\');
-+                p = p ? p+1 : name;
-+
-+                if(!strcmpiW(p, gta5W))
-+                {
-+                    FIXME("HACK: changing GTA5.exe vprot\n");
-+                    set_page_vprot_bits(base, page_size, VPROT_COPIED, 0);
-+                }
-+            }
-         }
-         else status = STATUS_NOT_COMMITTED;
-     }
 From 8fd9d6bd3d567893f933b7d55615446476745654 Mon Sep 17 00:00:00 2001
 From: Vincent Povirk <vincent@codeweavers.com>
 Date: Wed, 1 Apr 2020 11:47:05 -0500
@@ -1420,6 +1403,70 @@ index 9cd6812d032..9e5fe2f3129 100644
      while (*candidates)
      {
          WCHAR **args = CommandLineToArgvW( candidates, &count );
+From 3082a724542ba7527fa52eaac3611ed97ff91cac Mon Sep 17 00:00:00 2001
+From: Andrew Eikum <aeikum@codeweavers.com>
+Date: Mon, 10 Dec 2018 12:48:41 -0600
+Subject: [PATCH] xaudio2: Set PulseAudio application name property in the
+ environment
+
+So PA doesn't present all Wine applications as "wine-preloader", and
+allows PA to store per-application settings.
+---
+ dlls/winepulse.drv/mmdevdrv.c |  1 +
+ dlls/xaudio2_7/xaudio_dll.c   | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
+
+diff --git a/dlls/winepulse.drv/mmdevdrv.c b/dlls/winepulse.drv/mmdevdrv.c
+index c80ea4f9d04..6a2906761a7 100644
+--- a/dlls/winepulse.drv/mmdevdrv.c
++++ b/dlls/winepulse.drv/mmdevdrv.c
+@@ -571,6 +571,7 @@ static HRESULT pulse_connect(void)
+     WideCharToMultiByte(CP_UNIXCP, 0, name, -1, str, len, NULL, NULL);
+     TRACE("Name: %s\n", str);
+     pulse_ctx = pa_context_new(pa_mainloop_get_api(pulse_ml), str);
++    setenv("PULSE_PROP_application.name", str, 1);
+     pa_xfree(str);
+     if (!pulse_ctx) {
+         ERR("Failed to create context\n");
+diff --git a/dlls/xaudio2_7/xaudio_dll.c b/dlls/xaudio2_7/xaudio_dll.c
+index 4ca04198b6e..483e2b4138a 100644
+--- a/dlls/xaudio2_7/xaudio_dll.c
++++ b/dlls/xaudio2_7/xaudio_dll.c
+@@ -38,6 +38,7 @@
+ #include "wine/asm.h"
+ #include "wine/debug.h"
+ #include "wine/heap.h"
++#include "wine/unicode.h"
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(xaudio2);
+ 
+@@ -1948,6 +1949,26 @@ static HRESULT WINAPI XAudio2CF_CreateInstance(IClassFactory *iface, IUnknown *p
+     pthread_cond_init(&object->mst.engine_done, NULL);
+     pthread_cond_init(&object->mst.engine_ready, NULL);
+ 
++    /* set PulseAudio's application.name in the environment since FAudio and
++     * SDL provide no way to pass this in */
++    {
++        WCHAR path[MAX_PATH], *name;
++        char *str;
++        DWORD len;
++
++        GetModuleFileNameW(NULL, path, ARRAY_SIZE(path));
++        name = strrchrW(path, '\\');
++        if (!name)
++            name = path;
++        else
++            name++;
++        len = WideCharToMultiByte(CP_UNIXCP, 0, name, -1, NULL, 0, NULL, NULL);
++        str = HeapAlloc(GetProcessHeap(), 0, len);
++        WideCharToMultiByte(CP_UNIXCP, 0, name, -1, str, len, NULL, NULL);
++        setenv("PULSE_PROP_application.name", str, 1);
++        HeapFree(GetProcessHeap(), 0, str);
++    }
++
+     FAudioCOMConstructWithCustomAllocatorEXT(
+         &object->faudio,
+         XAUDIO2_VER,
 From b739d48093cce805b7b4f48fdbd9d0bb62bc8013 Mon Sep 17 00:00:00 2001
 From: Brendan Shanks <bshanks@codeweavers.com>
 Date: Mon, 13 Apr 2020 16:25:47 -0700
@@ -1496,6 +1543,37 @@ index 0ae3aadde92..e95ede8aed5 100644
      return FALSE;
  }
 
+From fdc1acce7e81f08eb10652b7b39b3d3e4bbed8f8 Mon Sep 17 00:00:00 2001
+From: Paul Gofman <pgofman@codeweavers.com>
+Date: Fri, 24 Apr 2020 20:08:38 +0300
+Subject: [PATCH] Avoid undefined result in ntdll_wcstoumbs() in case of error.
+
+Undefined result is due to RtlUnicodeToUTF8N() not setting output
+length on error which is a correct behaviour according to
+existing tests.
+
+'Planet Zoo' is affected which passes NULL object name buffer to
+NtCreateFile().
+
+Signed-off-by: Paul Gofman <gofmanp@gmail.com>
+---
+ dlls/ntdll/locale.c | 2 +-
+ 1 file changed, 1 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/ntdll/locale.c b/dlls/ntdll/locale.c
+index d6bde700e42..4f03e3881f0 100644
+--- a/dlls/ntdll/locale.c
++++ b/dlls/ntdll/locale.c
+@@ -769,7 +769,7 @@ DWORD ntdll_umbstowcs( const char *src, DWORD srclen, WCHAR *dst, DWORD dstlen )
+  */
+ int ntdll_wcstoumbs( const WCHAR *src, DWORD srclen, char *dst, DWORD dstlen, BOOL strict )
+ {
+-    DWORD i, reslen;
++    DWORD i, reslen = 0;
+ 
+     if (!unix_table.CodePage)
+         RtlUnicodeToUTF8N( dst, dstlen, &reslen, src, srclen * sizeof(WCHAR) );
+
 From 0255dbc3afd3ff673fa701e7802474483252fcb2 Mon Sep 17 00:00:00 2001
 From: Paul Gofman <pgofman@codeweavers.com>
 Date: Mon, 13 Jul 2020 10:21:49 -0500
@@ -1512,13 +1590,13 @@ index 6164b0c4bde..031be95e233 100644
 --- a/dlls/ntdll/tests/file.c
 +++ b/dlls/ntdll/tests/file.c
 @@ -144,16 +144,36 @@ static void create_file_test(void)
-     static const WCHAR pathInvalidDosW[] = {'\\','D','o','s','D','e','v','i','c','e','s','\\',0};
      static const char testdata[] = "Hello World";
+     static const WCHAR sepW[] = {'\\',0};
      FILE_NETWORK_OPEN_INFORMATION info;
 +    UNICODE_STRING nameW, null_string;
      NTSTATUS status;
      HANDLE dir, file;
-     WCHAR path[MAX_PATH];
+     WCHAR path[MAX_PATH], temp[MAX_PATH];
      OBJECT_ATTRIBUTES attr;
      IO_STATUS_BLOCK io;
 -    UNICODE_STRING nameW;
@@ -1570,109 +1648,6 @@ index 20eb6a05922..d99c6b462b2 100644
  
      name     = attr->ObjectName->Buffer;
      name_len = attr->ObjectName->Length / sizeof(WCHAR);
-From cb427c70056654bf12fb0d7d6dcb13386d193ff4 Mon Sep 17 00:00:00 2001
-From: =?UTF-8?q?Gabriel=20Iv=C4=83ncescu?= <gabrielopcode@gmail.com>
-Date: Fri, 24 Apr 2020 14:37:58 +0300
-Subject: [PATCH] server: Try to retrieve the unix name on handles created from
- file descriptors.
-MIME-Version: 1.0
-Content-Type: text/plain; charset=UTF-8
-Content-Transfer-Encoding: 8bit
-
-Wine-Bug: https://bugs.winehq.org/show_bug.cgi?id=46070
-Signed-off-by: Gabriel Ivăncescu <gabrielopcode@gmail.com>
-
-Fixes Unity of Command II, and possibly other games that use
-Python38.dll.
----
- server/fd.c   | 39 +++++++++++++++++++++++++++++++++++++++
- server/file.c |  1 +
- server/file.h |  2 ++
- 3 files changed, 42 insertions(+)
-
-diff --git a/server/fd.c b/server/fd.c
-index 904c99029ca..990a1a708a0 100644
---- a/server/fd.c
-+++ b/server/fd.c
-@@ -2079,6 +2079,45 @@ struct fd *create_anonymous_fd( const struct fd_ops *fd_user_ops, int unix_fd, s
-     return NULL;
- }
- 
-+void set_unix_name_of_fd( struct fd *fd, const struct stat *fd_st )
-+{
-+#ifdef __linux__
-+    static const char procfs_fmt[] = "/proc/self/fd/%d";
-+
-+    char path[PATH_MAX], procfs_path[sizeof(procfs_fmt) - 2 /* %d */ + 11];
-+    struct stat path_st;
-+    ssize_t len;
-+
-+    sprintf( procfs_path, procfs_fmt, fd->unix_fd );
-+    len = readlink( procfs_path, path, sizeof(path) );
-+    if (len == -1 || len >= sizeof(path) )
-+        return;
-+    path[len] = '\0';
-+
-+    /* Make sure it's an absolute path, has at least one hardlink, and the same inode */
-+    if (path[0] != '/' || stat( path, &path_st ) || path_st.st_nlink < 1 ||
-+        path_st.st_dev != fd_st->st_dev || path_st.st_ino != fd_st->st_ino)
-+        return;
-+
-+    if (!(fd->unix_name = mem_alloc( len + 1 )))
-+        return;
-+    memcpy( fd->unix_name, path, len + 1 );
-+
-+#elif defined(F_GETPATH)
-+    char path[PATH_MAX];
-+    size_t size;
-+
-+    if (fcntl( fd->unix_fd, F_GETPATH, path ) == -1 || path[0] != '/')
-+        return;
-+
-+    size = strlen(path) + 1;
-+    if (!(fd->unix_name = mem_alloc( size )))
-+        return;
-+    memcpy( fd->unix_name, path, size );
-+
-+#endif
-+}
-+
- /* retrieve the object that is using an fd */
- void *get_fd_user( struct fd *fd )
- {
-diff --git a/server/file.c b/server/file.c
-index e5e367478ce..e469341c746 100644
---- a/server/file.c
-+++ b/server/file.c
-@@ -147,6 +147,7 @@ struct file *create_file_for_fd( int fd, unsigned int access, unsigned int shari
-         release_object( file );
-         return NULL;
-     }
-+    set_unix_name_of_fd( file->fd, &st );
-     allow_fd_caching( file->fd );
-     return file;
- }
-diff --git a/server/file.h b/server/file.h
-index 0e43a8170df..7d614569a16 100644
---- a/server/file.h
-+++ b/server/file.h
-@@ -22,6 +22,7 @@
- #define __WINE_SERVER_FILE_H
- 
- #include <sys/types.h>
-+#include <sys/stat.h>
- 
- #include "object.h"
- 
-@@ -82,6 +83,7 @@ extern struct fd *open_fd( struct fd *root, const char *name, int flags, mode_t
-                            unsigned int access, unsigned int sharing, unsigned int options );
- extern struct fd *create_anonymous_fd( const struct fd_ops *fd_user_ops,
-                                        int unix_fd, struct object *user, unsigned int options );
-+extern void set_unix_name_of_fd( struct fd *fd, const struct stat *fd_st );
- extern struct fd *dup_fd_object( struct fd *orig, unsigned int access, unsigned int sharing,
-                                  unsigned int options );
- extern struct fd *get_fd_object_for_mapping( struct fd *fd, unsigned int access, unsigned int sharing );
-
 From 514d3e11c999b11a95ab35df5b4ab454d34fe791 Mon Sep 17 00:00:00 2001
 From: Paul Gofman <pgofman@codeweavers.com>
 Date: Wed, 13 May 2020 13:55:55 +0300
@@ -2339,17 +2314,19 @@ index 9f5e147b7ed..e986bac2205 100644
          /* GStreamer outputs RGB video top-down, but DirectShow expects bottom-up. */
          if (!(flip = gst_element_factory_make("videoflip", NULL)))
          {
-@@ -1044,22 +1048,35 @@ static void init_new_decoded_pad(GstElement *bin, GstPad *pad, struct gstdemux *
+@@ -1044,25 +1048,35 @@ static void init_new_decoded_pad(GstElement *bin, GstPad *pad, struct gstdemux *
              goto out;
          }
  
+-        /* Avoid expensive color matrix conversions. */
+-        gst_util_set_object_arg(G_OBJECT(vconv2), "matrix-mode", "none");
 +        /* To avoid expensive color matrix conversions, keep YUV colorimetry info */
 +        if (!(yuvfix2 = gst_element_factory_make("yuvfixup", NULL)))
 +        {
 +            ERR("Failed to create our yuvfixup2 element\n");
 +            goto out;
 +        }
-+
+ 
          /* The bin takes ownership of these elements. */
          gst_bin_add(GST_BIN(This->container), deinterlace);
          gst_element_sync_state_with_parent(deinterlace);
@@ -3028,12 +3005,12 @@ index 7e7e6fbdf29..3de4d241b8e 100644
  
 -        next_size = req->rawinput_size;
 -        if (size + next_size > req->buffer_size) break;
--        if (cur + sizeof(*data) > buf + get_reply_max_size()) break;
+-        if (cur + msg_size > buf + get_reply_max_size()) break;
 +        if (next_size) *next_size = client_elt_size;
 +        if (client_buf_size < client_elt_size) break;
 +        if (reply_buf_size < sizeof(*data)) break;
  
--        memcpy(cur, data, sizeof(*data));
+-        memcpy(cur, data, msg_size);
 -        list_remove( &msg->entry );
 -        free_message( msg );
 +        if (reply_buf)
@@ -3044,7 +3021,7 @@ index 7e7e6fbdf29..3de4d241b8e 100644
 +        }
  
 -        size += next_size;
--        cur += sizeof(*data);
+-        cur += msg_size;
 -        count++;
 +        client_buf_size -= client_elt_size;
 +        reply_buf_size -= sizeof(*data);
@@ -3082,595 +3059,3 @@ index 7e7e6fbdf29..3de4d241b8e 100644
 
 -- 
 2.29.2
-
-From e6c96f88d8f78a9890a5b96a8e85406ad9695f3c Mon Sep 17 00:00:00 2001
-From: Paul Gofman <pgofman@codeweavers.com>
-Date: Mon, 2 Nov 2020 23:03:20 +0300
-Subject: [PATCH] ntdll: (HACK) Add variable to report all logical CPUs as
- physical cores.
-
----
- dlls/ntdll/unix/system.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/dlls/ntdll/unix/system.c b/dlls/ntdll/unix/system.c
-index 0b83761ed46..bf3d6c34f14 100644
---- a/dlls/ntdll/unix/system.c
-+++ b/dlls/ntdll/unix/system.c
-@@ -830,7 +830,8 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-     static const char core_info[] = "/sys/devices/system/cpu/cpu%u/topology/%s";
-     static const char cache_info[] = "/sys/devices/system/cpu/cpu%u/cache/index%u/%s";
-     static const char numa_info[] = "/sys/devices/system/node/node%u/cpumap";
--
-+    const char *env_fake_logical_cores = getenv("WINE_LOGICAL_CPUS_AS_CORES");
-+    BOOL fake_logical_cpus_as_cores = env_fake_logical_cores && atoi(env_fake_logical_cores);
-     FILE *fcpu_list, *fnuma_list, *f;
-     DWORD len = 0, beg, end, i, j, r, num_cpus = 0, max_cpus = 0;
-     char op, name[MAX_PATH];
-@@ -902,7 +903,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-             {
-                 /* Mask of logical threads sharing same physical core in kernel core numbering. */
-                 sprintf(name, core_info, i, "thread_siblings");
--                if(!sysfs_parse_bitmap(name, &thread_mask)) thread_mask = 1<<i;
-+                if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
- 
-                 /* Needed later for NumaNode and Group. */
-                 all_cpus_mask |= thread_mask;
-@@ -910,7 +911,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-                 if (relation == RelationAll || relation == RelationProcessorCore)
-                 {
-                     sprintf(name, core_info, i, "thread_siblings_list");
--                    f = fopen(name, "r");
-+                    f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
-                     if (f)
-                     {
-                         fscanf(f, "%d%c", &phys_core, &op);
-From 2a3179a431c0b8df72f75ef5f134bd0098fabdc0 Mon Sep 17 00:00:00 2001
-From: Paul Gofman <pgofman@codeweavers.com>
-Date: Fri, 20 Nov 2020 18:01:11 +0300
-Subject: [PATCH] ntdll: Implement CPU topology override.
-
----
- dlls/ntdll/unix/server.c       |   3 +
- dlls/ntdll/unix/system.c       | 167 ++++++++++++++++++++++++++++++---
- dlls/ntdll/unix/thread.c       |  15 ++-
- dlls/ntdll/unix/unix_private.h |   1 +
- include/wine/server_protocol.h |   9 +-
- server/process.c               |   7 ++
- server/process.h               |   1 +
- server/protocol.def            |   7 ++
- server/thread.c                |  20 +++-
- server/trace.c                 |  19 ++++
- 10 files changed, 228 insertions(+), 21 deletions(-)
-
-diff --git a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
-index b1d3e863240..7b0c7c32f58 100644
---- a/dlls/ntdll/unix/server.c
-+++ b/dlls/ntdll/unix/server.c
-@@ -1467,6 +1467,7 @@ void CDECL server_init_process_done( void *relay )
-     PEB *peb = NtCurrentTeb()->Peb;
-     IMAGE_NT_HEADERS *nt = get_exe_nt_header();
-     void *entry = (char *)peb->ImageBaseAddress + nt->OptionalHeader.AddressOfEntryPoint;
-+    struct cpu_topology_override *cpu_override = get_cpu_topology_override();
-     NTSTATUS status;
-     int suspend;
- 
-@@ -1488,6 +1489,8 @@ void CDECL server_init_process_done( void *relay )
- #endif
-         req->entry    = wine_server_client_ptr( entry );
-         req->gui      = (nt->OptionalHeader.Subsystem != IMAGE_SUBSYSTEM_WINDOWS_CUI);
-+        if (cpu_override)
-+            wine_server_add_data( req, cpu_override, sizeof(*cpu_override) );
-         status = wine_server_call( req );
-         suspend = reply->suspend;
-     }
-diff --git a/dlls/ntdll/unix/system.c b/dlls/ntdll/unix/system.c
-index bf3d6c34f14..fc8165f2828 100644
---- a/dlls/ntdll/unix/system.c
-+++ b/dlls/ntdll/unix/system.c
-@@ -29,6 +29,7 @@
- #include <stdio.h>
- #include <stdlib.h>
- #include <errno.h>
-+#include <assert.h>
- #ifdef HAVE_SYS_TIME_H
- # include <sys/time.h>
- #endif
-@@ -165,6 +166,12 @@ struct smbios_boot_info
- #define RSMB 0x52534D42
- 
- static SYSTEM_CPU_INFORMATION cpu_info;
-+static struct
-+{
-+    struct cpu_topology_override mapping;
-+    BOOL smt;
-+}
-+cpu_override;
- 
- /*******************************************************************************
-  * Architecture specific feature detection for CPUs
-@@ -475,6 +482,88 @@ static void get_cpuinfo( SYSTEM_CPU_INFORMATION *info )
- 
- #endif /* End architecture specific feature detection for CPUs */
- 
-+static void fill_cpu_override(unsigned int host_cpu_count)
-+{
-+    const char *env_override = getenv("WINE_CPU_TOPOLOGY");
-+    unsigned int i;
-+    char *s;
-+
-+    if (!env_override)
-+        return;
-+
-+    cpu_override.mapping.cpu_count = strtol(env_override, &s, 10);
-+    if (s == env_override)
-+        goto error;
-+
-+    if (!cpu_override.mapping.cpu_count || cpu_override.mapping.cpu_count > MAXIMUM_PROCESSORS)
-+    {
-+        ERR("Invalid logical CPU count %u, limit %u.\n", cpu_override.mapping.cpu_count, MAXIMUM_PROCESSORS);
-+        goto error;
-+    }
-+
-+    if (tolower(*s) == 's')
-+    {
-+        cpu_override.mapping.cpu_count *= 2;
-+        if (cpu_override.mapping.cpu_count > MAXIMUM_PROCESSORS)
-+        {
-+            ERR("Logical CPU count exceeds limit %u.\n", MAXIMUM_PROCESSORS);
-+            goto error;
-+        }
-+        cpu_override.smt = TRUE;
-+        ++s;
-+    }
-+    if (*s != ':')
-+        goto error;
-+    ++s;
-+    for (i = 0; i < cpu_override.mapping.cpu_count; ++i)
-+    {
-+        char *next;
-+
-+        if (i)
-+        {
-+            if (*s != ',')
-+            {
-+                if (!*s)
-+                    ERR("Incomplete host CPU mapping string, %u CPUs mapping required.\n",
-+                            cpu_override.mapping.cpu_count);
-+                goto error;
-+            }
-+            ++s;
-+        }
-+
-+        cpu_override.mapping.host_cpu_id[i] = strtol(s, &next, 10);
-+        if (next == s)
-+            goto error;
-+        if (cpu_override.mapping.host_cpu_id[i] >= host_cpu_count)
-+        {
-+            ERR("Invalid host CPU index %u (host_cpu_count %u).\n",
-+                    cpu_override.mapping.host_cpu_id[i], host_cpu_count);
-+            goto error;
-+        }
-+        s = next;
-+    }
-+    if (*s)
-+        goto error;
-+
-+    ERR("Overriding CPU configuration, %u logical CPUs, host CPUs ", cpu_override.mapping.cpu_count);
-+    for (i = 0; i < cpu_override.mapping.cpu_count; ++i)
-+    {
-+        if (i)
-+            ERR(",");
-+        ERR("%u", cpu_override.mapping.host_cpu_id[i]);
-+    }
-+    ERR("\n");
-+    return;
-+error:
-+    cpu_override.mapping.cpu_count = 0;
-+    ERR("Invalid WINE_CPU_TOPOLOGY string %s (%s).\n", debugstr_a(env_override), debugstr_a(s));
-+}
-+
-+struct cpu_topology_override *get_cpu_topology_override(void)
-+{
-+    return cpu_override.mapping.cpu_count ? &cpu_override.mapping : NULL;
-+}
-+
- /******************************************************************
-  *		init_cpu_info
-  *
-@@ -508,7 +597,11 @@ void init_cpu_info(void)
-     num = 1;
-     FIXME("Detecting the number of processors is not supported.\n");
- #endif
--    NtCurrentTeb()->Peb->NumberOfProcessors = num;
-+
-+    fill_cpu_override(num);
-+
-+    NtCurrentTeb()->Peb->NumberOfProcessors = cpu_override.mapping.cpu_count
-+            ? cpu_override.mapping.cpu_count : num;
-     get_cpuinfo( &cpu_info );
-     TRACE( "<- CPU arch %d, level %d, rev %d, features 0x%x\n",
-            cpu_info.Architecture, cpu_info.Level, cpu_info.Revision, cpu_info.FeatureSet );
-@@ -860,6 +953,12 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-         if (op == '-') fscanf(fcpu_list, "%u%c ", &end, &op);
-         else end = beg;
- 
-+        if (cpu_override.mapping.cpu_count)
-+        {
-+            beg = 0;
-+            end = cpu_override.mapping.cpu_count - 1;
-+        }
-+
-         for(i = beg; i <= end; i++)
-         {
-             DWORD phys_core = 0;
-@@ -873,7 +972,9 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
- 
-             if (relation == RelationAll || relation == RelationProcessorPackage)
-             {
--                sprintf(name, core_info, i, "physical_package_id");
-+                sprintf(name, core_info, cpu_override.mapping.cpu_count ? cpu_override.mapping.host_cpu_id[i] : i,
-+                        "physical_package_id");
-+
-                 f = fopen(name, "r");
-                 if (f)
-                 {
-@@ -881,6 +982,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-                     fclose(f);
-                 }
-                 else r = 0;
-+
-                 if (!logical_proc_info_add_by_id(data, dataex, &len, max_len, RelationProcessorPackage, r, (ULONG_PTR)1 << i))
-                 {
-                     fclose(fcpu_list);
-@@ -903,21 +1005,36 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-             {
-                 /* Mask of logical threads sharing same physical core in kernel core numbering. */
-                 sprintf(name, core_info, i, "thread_siblings");
--                if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
-+
-+                if (cpu_override.mapping.cpu_count)
-+                {
-+                    thread_mask = cpu_override.smt ? (ULONG_PTR)0x3 << (i & ~1) : (ULONG_PTR)1 << i;
-+                }
-+                else
-+                {
-+                    if(fake_logical_cpus_as_cores || !sysfs_parse_bitmap(name, &thread_mask)) thread_mask = (ULONG_PTR)1<<i;
-+                }
- 
-                 /* Needed later for NumaNode and Group. */
-                 all_cpus_mask |= thread_mask;
- 
-                 if (relation == RelationAll || relation == RelationProcessorCore)
-                 {
--                    sprintf(name, core_info, i, "thread_siblings_list");
--                    f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
--                    if (f)
-+                    if (cpu_override.mapping.cpu_count)
-                     {
--                        fscanf(f, "%d%c", &phys_core, &op);
--                        fclose(f);
-+                        phys_core = cpu_override.smt ? i / 2 : i;
-+                    }
-+                    else
-+                    {
-+                        sprintf(name, core_info, i, "thread_siblings_list");
-+                        f = fake_logical_cpus_as_cores ? NULL : fopen(name, "r");
-+                        if (f)
-+                        {
-+                            fscanf(f, "%d%c", &phys_core, &op);
-+                            fclose(f);
-+                        }
-+                        else phys_core = i;
-                     }
--                    else phys_core = i;
- 
-                     if (!logical_proc_info_add_by_id(data, dataex, &len, max_len, RelationProcessorCore, phys_core, thread_mask))
-                     {
-@@ -929,36 +1046,40 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
- 
-             if (relation == RelationAll || relation == RelationCache)
-             {
-+                unsigned int cpu_id;
-+
-+                cpu_id = cpu_override.mapping.cpu_count ? cpu_override.mapping.host_cpu_id[i] : i;
-+
-                 for(j = 0; j < 4; j++)
-                 {
-                     CACHE_DESCRIPTOR cache;
-                     ULONG_PTR mask = 0;
- 
--                    sprintf(name, cache_info, i, j, "shared_cpu_map");
-+                    sprintf(name, cache_info, cpu_id, j, "shared_cpu_map");
-                     if(!sysfs_parse_bitmap(name, &mask)) continue;
- 
--                    sprintf(name, cache_info, i, j, "level");
-+                    sprintf(name, cache_info, cpu_id, j, "level");
-                     f = fopen(name, "r");
-                     if(!f) continue;
-                     fscanf(f, "%u", &r);
-                     fclose(f);
-                     cache.Level = r;
- 
--                    sprintf(name, cache_info, i, j, "ways_of_associativity");
-+                    sprintf(name, cache_info, cpu_id, j, "ways_of_associativity");
-                     f = fopen(name, "r");
-                     if(!f) continue;
-                     fscanf(f, "%u", &r);
-                     fclose(f);
-                     cache.Associativity = r;
- 
--                    sprintf(name, cache_info, i, j, "coherency_line_size");
-+                    sprintf(name, cache_info, cpu_id, j, "coherency_line_size");
-                     f = fopen(name, "r");
-                     if(!f) continue;
-                     fscanf(f, "%u", &r);
-                     fclose(f);
-                     cache.LineSize = r;
- 
--                    sprintf(name, cache_info, i, j, "size");
-+                    sprintf(name, cache_info, cpu_id, j, "size");
-                     f = fopen(name, "r");
-                     if(!f) continue;
-                     fscanf(f, "%u%c", &r, &op);
-@@ -967,7 +1088,7 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-                         WARN("unknown cache size %u%c\n", r, op);
-                     cache.Size = (op=='K' ? r*1024 : r);
- 
--                    sprintf(name, cache_info, i, j, "type");
-+                    sprintf(name, cache_info, cpu_id, j, "type");
-                     f = fopen(name, "r");
-                     if(!f) continue;
-                     fscanf(f, "%s", name);
-@@ -979,6 +1100,19 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-                     else
-                         cache.Type = CacheUnified;
- 
-+                    if (cpu_override.mapping.cpu_count)
-+                    {
-+                        ULONG_PTR host_mask = mask;
-+                        unsigned int id;
-+
-+                        mask = 0;
-+                        for (id = 0; id < cpu_override.mapping.cpu_count; ++id)
-+                            if (host_mask & ((ULONG_PTR)1 << cpu_override.mapping.host_cpu_id[id]))
-+                                mask |= (ULONG_PTR)1 << id;
-+
-+                        assert(mask);
-+                    }
-+
-                     if (!logical_proc_info_add_cache(data, dataex, &len, max_len, mask, &cache))
-                     {
-                         fclose(fcpu_list);
-@@ -987,6 +1121,9 @@ static NTSTATUS create_logical_proc_info( SYSTEM_LOGICAL_PROCESSOR_INFORMATION *
-                 }
-             }
-         }
-+
-+        if (cpu_override.mapping.cpu_count)
-+            break;
-     }
-     fclose(fcpu_list);
- 
-diff --git a/dlls/ntdll/unix/thread.c b/dlls/ntdll/unix/thread.c
-index ca5dac43bb0..bc6a5451611 100644
---- a/dlls/ntdll/unix/thread.c
-+++ b/dlls/ntdll/unix/thread.c
-@@ -1323,7 +1323,20 @@ ULONG WINAPI NtGetCurrentProcessorNumber(void)
- 
- #if defined(__linux__) && defined(__NR_getcpu)
-     int res = syscall(__NR_getcpu, &processor, NULL, NULL);
--    if (res != -1) return processor;
-+    if (res != -1)
-+    {
-+        struct cpu_topology_override *override = get_cpu_topology_override();
-+        unsigned int i;
-+
-+        if (!override)
-+            return processor;
-+
-+        for (i = 0; i < override->cpu_count; ++i)
-+            if (override->host_cpu_id[i] == processor)
-+                return i;
-+
-+        WARN("Thread is running on processor which is not in the defined override.\n");
-+    }
- #endif
- 
-     if (NtCurrentTeb()->Peb->NumberOfProcessors > 1)
-diff --git a/dlls/ntdll/unix/unix_private.h b/dlls/ntdll/unix/unix_private.h
-index a3a418cfaa5..8edd529afd8 100644
---- a/dlls/ntdll/unix/unix_private.h
-+++ b/dlls/ntdll/unix/unix_private.h
-@@ -247,6 +247,7 @@ extern NTSTATUS open_unix_file( HANDLE *handle, const char *unix_name, ACCESS_MA
-                                 ULONG options, void *ea_buffer, ULONG ea_length ) DECLSPEC_HIDDEN;
- extern void init_files(void) DECLSPEC_HIDDEN;
- extern void init_cpu_info(void) DECLSPEC_HIDDEN;
-+extern struct cpu_topology_override *get_cpu_topology_override(void) DECLSPEC_HIDDEN;
- 
- extern void dbg_init(void) DECLSPEC_HIDDEN;
- 
-diff --git a/include/wine/server_protocol.h b/include/wine/server_protocol.h
-index f4f45d958be..aed7090572b 100644
---- a/include/wine/server_protocol.h
-+++ b/include/wine/server_protocol.h
-@@ -794,6 +794,12 @@ typedef struct
-     lparam_t info;
- } cursor_pos_t;
- 
-+struct cpu_topology_override
-+{
-+    unsigned int cpu_count;
-+    unsigned char host_cpu_id[64];
-+};
-+
- 
- 
- 
-@@ -895,6 +901,7 @@ struct init_process_done_request
-     mod_handle_t module;
-     client_ptr_t ldt_copy;
-     client_ptr_t entry;
-+    /* VARARG(cpu_override,cpu_topology_override); */
- };
- struct init_process_done_reply
- {
-diff --git a/server/process.c b/server/process.c
-index 97e074a5261..d1f9ab764f7 100644
---- a/server/process.c
-+++ b/server/process.c
-@@ -73,6 +73,7 @@ static void process_destroy( struct object *obj );
- static int process_get_esync_fd( struct object *obj, enum esync_type *type );
- static unsigned int process_get_fsync_idx( struct object *obj, enum fsync_type *type );
- static void terminate_process( struct process *process, struct thread *skip, int exit_code );
-+static void set_process_affinity( struct process *process, affinity_t affinity );
- 
- static const struct object_ops process_ops =
- {
-@@ -550,6 +551,7 @@ struct process *create_process( int fd, struct process *parent, int inherit_all,
-     process->rawinput_kbd    = NULL;
-     process->esync_fd        = -1;
-     process->fsync_idx       = 0;
-+    process->cpu_override.cpu_count = 0;
-     list_init( &process->kernel_object );
-     list_init( &process->thread_list );
-     list_init( &process->locks );
-@@ -1368,6 +1370,8 @@ DECL_HANDLER(init_process_done)
- {
-     struct process_dll *dll;
-     struct process *process = current->process;
-+    const struct cpu_topology_override *cpu_override = get_req_data();
-+    unsigned int have_cpu_override = get_req_data_size() / sizeof(*cpu_override);
- 
-     if (is_process_init_done(process))
-     {
-@@ -1397,6 +1401,9 @@ DECL_HANDLER(init_process_done)
-     if (req->gui) process->idle_event = create_event( NULL, NULL, 0, 1, 0, NULL );
-     if (process->debugger) set_process_debug_flag( process, 1 );
-     reply->suspend = (current->suspend || process->suspend);
-+
-+    if (have_cpu_override)
-+        process->cpu_override = *cpu_override;
- }
- 
- /* open a handle to a process */
-diff --git a/server/process.h b/server/process.h
-index 430fd365508..d1b8b3fc222 100644
---- a/server/process.h
-+++ b/server/process.h
-@@ -100,6 +100,7 @@ struct process
-     struct list          kernel_object;   /* list of kernel object pointers */
-     int                  esync_fd;        /* esync file descriptor (signaled on exit) */
-     unsigned int         fsync_idx;
-+    struct cpu_topology_override cpu_override; /* Overridden CPUs to host CPUs mapping. */
- };
- 
- #define CPU_FLAG(cpu) (1 << (cpu))
-diff --git a/server/protocol.def b/server/protocol.def
-index 48f9f4fae90..0f2fe077b80 100644
---- a/server/protocol.def
-+++ b/server/protocol.def
-@@ -810,6 +810,12 @@ typedef struct
-     lparam_t info;
- } cursor_pos_t;
- 
-+struct cpu_topology_override
-+{
-+    unsigned int cpu_count;
-+    unsigned char host_cpu_id[64];
-+};
-+
- /****************************************************************/
- /* Request declarations */
- 
-@@ -877,6 +883,7 @@ typedef struct
-     mod_handle_t module;       /* main module base address */
-     client_ptr_t ldt_copy;     /* address of LDT copy (in thread address space) */
-     client_ptr_t entry;        /* process entry point */
-+    VARARG(cpu_override,cpu_topology_override); /* Overridden CPUs to host CPUs mapping. */
- @REPLY
-     int          suspend;      /* is process suspended? */
- @END
-diff --git a/server/thread.c b/server/thread.c
-index 0fb3aa0e727..31043c3df33 100644
---- a/server/thread.c
-+++ b/server/thread.c
-@@ -605,8 +605,19 @@ int set_thread_affinity( struct thread *thread, affinity_t affinity )
- 
-         CPU_ZERO( &set );
-         for (i = 0, mask = 1; mask; i++, mask <<= 1)
--            if (affinity & mask) CPU_SET( i, &set );
--
-+            if (affinity & mask)
-+            {
-+                if (thread->process->cpu_override.cpu_count)
-+                {
-+                    if (i >= thread->process->cpu_override.cpu_count)
-+                        break;
-+                    CPU_SET( thread->process->cpu_override.host_cpu_id[i], &set );
-+                }
-+                else
-+                {
-+                    CPU_SET( i, &set );
-+                }
-+            }
-         ret = sched_setaffinity( thread->unix_tid, sizeof(set), &set );
-     }
- #endif
-@@ -1500,7 +1511,7 @@ DECL_HANDLER(init_thread)
-         reply->info_size  = init_process( current );
-         if (!process->parent_id)
-             process->affinity = current->affinity = get_thread_affinity( current );
--        else
-+        else if (!process->cpu_override.cpu_count)
-             set_thread_affinity( current, current->affinity );
-     }
-     else
-@@ -1514,7 +1525,8 @@ DECL_HANDLER(init_thread)
-             process->unix_pid = -1;  /* can happen with linuxthreads */
-         init_thread_context( current );
-         generate_debug_event( current, CREATE_THREAD_DEBUG_EVENT, &req->entry );
--        set_thread_affinity( current, current->affinity );
-+        if (!process->cpu_override.cpu_count)
-+            set_thread_affinity( current, current->affinity );
-     }
-     debug_level = max( debug_level, req->debug_level );
- 
-diff --git a/server/trace.c b/server/trace.c
-index e3a29beb6da..7df5681357b 100644
---- a/server/trace.c
-+++ b/server/trace.c
-@@ -1293,6 +1293,24 @@ static void dump_varargs_handle_infos( const char *prefix, data_size_t size )
-     fputc( '}', stderr );
- }
- 
-+static void dump_varargs_cpu_topology_override( const char *prefix, data_size_t size )
-+{
-+    const struct cpu_topology_override *cpu_topology = cur_data;
-+    unsigned int i;
-+
-+    if (size < sizeof(*cpu_topology))
-+        return;
-+
-+    fprintf( stderr,"%s{", prefix );
-+    for (i = 0; i < cpu_topology->cpu_count; ++i)
-+    {
-+        if (i) fputc( ',', stderr );
-+        fprintf( stderr, "%u", cpu_topology->host_cpu_id[i] );
-+    }
-+    fputc( '}', stderr );
-+    remove_data( size );
-+}
-+
- typedef void (*dump_func)( const void *req );
- 
- /* Everything below this line is generated automatically by tools/make_requests */
-@@ -1369,6 +1387,7 @@ static void dump_init_process_done_request( const struct init_process_done_reque
-     dump_uint64( ", module=", &req->module );
-     dump_uint64( ", ldt_copy=", &req->ldt_copy );
-     dump_uint64( ", entry=", &req->entry );
-+    dump_varargs_cpu_topology_override( ", cpu_override=", cur_size );
- }
- 
- static void dump_init_process_done_reply( const struct init_process_done_reply *req )
- 

@@ -542,7 +542,7 @@ _prepare() {
 	  echo -e "( MTGA bandaid reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
-	if [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && git merge-base --is-ancestor da7d60bf97fb8726828e57f852e8963aacde21e9 HEAD; then
+	if [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && git merge-base --is-ancestor da7d60bf97fb8726828e57f852e8963aacde21e9 HEAD && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
 	  _committorevert=da7d60bf97fb8726828e57f852e8963aacde21e9 && nonuser_reverter
 	  echo -e "( Proton gamepad additions unbreak revert applied )\n" >> "$_where"/last_build_config.log
 	fi
@@ -1655,7 +1655,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 251262a44a8f8403fd963e7bb510da778944af1b HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6f158754435f403864052e595ab627dadac2666f HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1717,7 +1717,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor 447924a6d68f7919bd451661314a52aa99cab709 HEAD; then
+	    if git merge-base --is-ancestor 251262a44a8f8403fd963e7bb510da778944af1b HEAD; then
+	      _lastcommit="6f15875"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 447924a6d68f7919bd451661314a52aa99cab709 HEAD; then
 	      _lastcommit="251262a"
 	      _rpc="1"
 	      _stmbits="1"
@@ -2018,14 +2022,16 @@ EOM
 	  _patchname='proton_fs_hack_integer_scaling.patch' && _patchmsg="Enable Proton fs hack integer scaling" && nonuser_patcher
 	fi
 	if [ "$_update_winevulkan" = "true" ] && git merge-base --is-ancestor 7e736b5903d3d078bbf7bb6a509536a942f6b9a0 HEAD; then
-	  if git merge-base --is-ancestor fc893489fe89c9fbd22f0cbe1c4327c64f05e0dc HEAD; then
+	  if git merge-base --is-ancestor 7d8c50e4371f2fc5300b90b323210c922d80d4e9 HEAD; then
 	    if [ "$_proton_fs_hack" = "true" ]; then
 	      _patchname='proton-winevulkan.patch' && _patchmsg="Using Proton winevulkan patches" && nonuser_patcher
 	    else
 	      _patchname='proton-winevulkan-nofshack.patch' && _patchmsg="Using Proton winevulkan patches (nofshack)" && nonuser_patcher
 	    fi
 	  else
-	    if git merge-base --is-ancestor bff6bc6a79ffc3a915219a6dfe64c9bcabaaeceb HEAD; then
+	    if git merge-base --is-ancestor fc893489fe89c9fbd22f0cbe1c4327c64f05e0dc HEAD; then
+	      _lastcommit="7d8c50e"
+	    elif git merge-base --is-ancestor bff6bc6a79ffc3a915219a6dfe64c9bcabaaeceb HEAD; then
 	      _lastcommit="fc89348"
 	    elif git merge-base --is-ancestor 1e074c39f635c585595e9f3ece99aa290a7f9cf8 HEAD; then
 	      _lastcommit="bff6bc6"
