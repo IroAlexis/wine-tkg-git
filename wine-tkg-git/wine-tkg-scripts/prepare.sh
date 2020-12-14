@@ -249,7 +249,7 @@ _pkgnaming() {
 #        pkgname="${pkgname/%-git/-fsync-git}"
         msg2 "Using fsync patchset"
       else
-        pkgname="${pkgname/%-git/-esync-git}"
+#        pkgname="${pkgname/%-git/-esync-git}"
         msg2 "Using esync patchset"
       fi
     fi
