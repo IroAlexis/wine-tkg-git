@@ -380,47 +380,36 @@ function setup_dxvk_version_url {
 
 function download_dxvk_version {
   while true ; do
-      if [ "$_use_dxvk" = "latest" ]; then
+      setup_dxvk_version_url
+      # If anything goes wrong we get exit code 22 from "curl -f"
+      set +e
+      _dxvk_version_response=$(curl -s -f "$_dxvk_version_url")
+      _dxvk_version_response_status=$?
+      set -e
+      if [ $_dxvk_version_response_status -eq 0 ]; then
         echo "#######################################################"
         echo ""
-        echo " Downloading latest DXVK artifact from git.froggi.es for you..."
+        echo " Downloading ${_dxvk_version} DXVK release from github for you..."
         echo ""
         echo "#######################################################"
         echo ""
-        wget -q -O dxvk-latest-artifact.zip "https://git.froggi.es/doitsujin/dxvk/-/jobs/artifacts/master/download?job=dxvk"
+        echo "$_dxvk_version_response" \
+        | grep "browser_download_url.*tar.gz" \
+        | cut -d : -f 2,3 \
+        | tr -d \" \
+        | wget -qi -
         break
       else
-        setup_dxvk_version_url
-        # If anything goes wrong we get exit code 22 from "curl -f"
-        set +e
-        _dxvk_version_response=$(curl -s -f "$_dxvk_version_url")
-        _dxvk_version_response_status=$?
-        set -e
-        if [ $_dxvk_version_response_status -eq 0 ]; then
-          echo "#######################################################"
-          echo ""
-          echo " Downloading ${_dxvk_version} DXVK release from github for you..."
-          echo ""
-          echo "#######################################################"
-          echo ""
-          echo "$_dxvk_version_response" \
-          | grep "browser_download_url.*tar.gz" \
-          | cut -d : -f 2,3 \
-          | tr -d \" \
-          | wget -qi -
-          break
-        else
-          echo ""
-          echo "#######################################################"
-          echo ""
-          echo " Could not download specified DXVK version (${_dxvk_version})"
-          echo ""
-          echo "#######################################################"
-          echo ""
-          echo "Please select DXVK release version (ex: v1.6.1)"
-          read -rp "> [latest]: " _dxvk_version
-          echo ""
-        fi
+        echo ""
+        echo "#######################################################"
+        echo ""
+        echo " Could not download specified DXVK version (${_dxvk_version})"
+        echo ""
+        echo "#######################################################"
+        echo ""
+        echo "Please select DXVK release version (ex: v1.6.1)"
+        read -rp "> [latest]: " _dxvk_version
+        echo ""
       fi
   done
 }
@@ -626,18 +615,19 @@ else
     tar -xvJf "$_nowhere"/mono/wine-mono-*.tar.xz -C proton_dist_tmp/share/wine/mono >/dev/null 2>&1
 
     # gecko
-    _gecko_ver="2.47.1"
+    _gecko_ver="2.47.2"
+    _gecko_compression=".tar.xz"
     mkdir -p "$_nowhere"/gecko && cd "$_nowhere"/gecko
-    if [ ! -e "wine-gecko-$_gecko_ver-x86_64.tar.bz2" ]; then
-      wget https://dl.winehq.org/wine/wine-gecko/$_gecko_ver/wine-gecko-$_gecko_ver-x86_64.tar.bz2
+    if [ ! -e "wine-gecko-$_gecko_ver-x86_64$_gecko_compression" ]; then
+      wget https://dl.winehq.org/wine/wine-gecko/$_gecko_ver/wine-gecko-$_gecko_ver-x86_64$_gecko_compression
     fi
-    if [ ! -e "wine-gecko-$_gecko_ver-x86.tar.bz2" ]; then
-      wget https://dl.winehq.org/wine/wine-gecko/$_gecko_ver/wine-gecko-$_gecko_ver-x86.tar.bz2
+    if [ ! -e "wine-gecko-$_gecko_ver-x86$_gecko_compression" ]; then
+      wget https://dl.winehq.org/wine/wine-gecko/$_gecko_ver/wine-gecko-$_gecko_ver-x86$_gecko_compression
     fi
     cd "$_nowhere"
     mkdir -p proton_dist_tmp/share/wine/gecko
-    tar -xvf "$_nowhere"/gecko/wine-gecko-$_gecko_ver-x86_64.tar.* -C proton_dist_tmp/share/wine/gecko >/dev/null 2>&1
-    tar -xvf "$_nowhere"/gecko/wine-gecko-$_gecko_ver-x86.tar.* -C proton_dist_tmp/share/wine/gecko >/dev/null 2>&1
+    tar -xvf "$_nowhere"/gecko/wine-gecko-$_gecko_ver-x86_64$_gecko_compression -C proton_dist_tmp/share/wine/gecko >/dev/null 2>&1
+    tar -xvf "$_nowhere"/gecko/wine-gecko-$_gecko_ver-x86$_gecko_compression -C proton_dist_tmp/share/wine/gecko >/dev/null 2>&1
 
     echo ''
     echo "Packaging..."
