@@ -959,10 +959,12 @@ _prepare() {
 	#    _patchname='esync-unix-staging.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	#  fi
 	if [ "$_use_esync" = "true" ]; then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	    _patchname='esync-unix-mainline.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
+	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	    _patchname='esync-unix-mainline-2b6426d.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2a132a18390e848b90c0273e891cbeb6d140bc70 HEAD ); then
-	    _patchname='esync-unix-mainline-c1a042ce.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
+	    _patchname='esync-unix-mainline-c1a042c.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2a132a18390e848b90c0273e891cbeb6d140bc70 HEAD ); then
 	    _patchname='esync-unix-mainline-3100197.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor cf49617c1a378dd4a37ab7226187708c501b046f HEAD ); then
@@ -1316,8 +1318,10 @@ EOM
 	# fsync - experimental replacement for esync introduced with Proton 4.11-1
 	if [ "$_use_fsync" = "true" ]; then
 	  if [ "$_staging_esync" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	      _patchname='fsync-unix-staging.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	      _patchname='fsync-unix-staging-2b6426d.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor dc77e28b0f7d6fdb11dafacb73b9889545359572 HEAD ); then
 	      _patchname='fsync-unix-staging-c1a042c.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7bdc1d6bacaba02b914ca3b66ee239103201617d HEAD ); then
@@ -1354,8 +1358,10 @@ EOM
 	      _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch" && nonuser_patcher
 	    fi
 	  elif [ "$_use_esync" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	      _patchname='fsync-unix-mainline.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
+	      _patchname='fsync-unix-mainline-2b6426d.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 310019789f7bde12ae3f25f723957c975fb2f804 HEAD ); then
 	      _patchname='fsync-unix-mainline-c1a042c.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor cf49617c1a378dd4a37ab7226187708c501b046f HEAD ); then
@@ -1671,7 +1677,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6f158754435f403864052e595ab627dadac2666f HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor d4bb0c4639aea2e8df80e577bd20b7f51c033e33 HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1733,7 +1739,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor 251262a44a8f8403fd963e7bb510da778944af1b HEAD; then
+	    if git merge-base --is-ancestor 6f158754435f403864052e595ab627dadac2666f HEAD; then
+	      _lastcommit="d4bb0c4"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 251262a44a8f8403fd963e7bb510da778944af1b HEAD; then
 	      _lastcommit="6f15875"
 	      _rpc="1"
 	      _stmbits="1"
@@ -1958,7 +1968,11 @@ EOM
 
 	# Proton CPU topology override - depends on protonify and fsync
 	if [ "$_use_fsync" = "true" ] && [ "$_protonify" = "true" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6f158754435f403864052e595ab627dadac2666f HEAD ); then
-	  _patchname='proton-cpu-topology-overrides.patch' && _patchmsg="Enable Proton's CPU topology override support" && nonuser_patcher
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7999af82448c340b28e3d6e412463c5cdcc6cea6 HEAD ); then
+	    _patchname='proton-cpu-topology-overrides.patch' && _patchmsg="Enable Proton's CPU topology override support" && nonuser_patcher
+	  else
+	    _patchname='proton-cpu-topology-overrides-7999af8.patch' && _patchmsg="Enable Proton's CPU topology override support" && nonuser_patcher
+	  fi
 	fi
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
