@@ -542,14 +542,13 @@ _prepare() {
 	  echo -e "( MTGA bandaid reverts applied )\n" >> "$_where"/last_build_config.log
 	fi
 
-	if [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]; then
-	  if git merge-base --is-ancestor da7d60bf97fb8726828e57f852e8963aacde21e9 HEAD && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
-	    _committorevert=da7d60bf97fb8726828e57f852e8963aacde21e9 && nonuser_reverter
-	    echo -e "( Proton gamepad additions unbreak revert applied )\n" >> "$_where"/last_build_config.log
-	  elif  git merge-base --is-ancestor e4fbae832c868e9fcf5a91c58255fe3f4ea1cb30 HEAD; then
-	    _committorevert=e4fbae832c868e9fcf5a91c58255fe3f4ea1cb30 && nonuser_reverter
-	    echo -e "( Proton gamepad additions exp unbreak revert applied )\n" >> "$_where"/last_build_config.log
-	  fi
+	if [ "$_sdl_joy_support" = "true" ] && [ "$_use_staging" != "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && git merge-base --is-ancestor e4fbae832c868e9fcf5a91c58255fe3f4ea1cb30 HEAD; then
+	  _committorevert=e4fbae832c868e9fcf5a91c58255fe3f4ea1cb30 && nonuser_reverter
+	  echo -e "( Proton SDL Joystick support unbreak revert applied )\n" >> "$_where"/last_build_config.log
+	fi
+	if [ "$_gamepad_additions" = "true" ] && [ "$_use_staging" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && git merge-base --is-ancestor da7d60bf97fb8726828e57f852e8963aacde21e9 HEAD && ! git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD; then
+	  _committorevert=da7d60bf97fb8726828e57f852e8963aacde21e9 && nonuser_reverter
+	  echo -e "( Proton gamepad additions unbreak revert applied )\n" >> "$_where"/last_build_config.log
 	fi
 
 	if [ "$_warframelauncher_fix" = "true" ] && git merge-base --is-ancestor 5e218fe758fe6beed5c7ad73405eccf33c307e6d HEAD && ! git merge-base --is-ancestor adfb042819472a23f4d07f7aeea194e463855806 HEAD; then
@@ -942,7 +941,7 @@ _prepare() {
 	if [ "$_use_staging" = "true" ] && [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW2" =~ [yY] ]]; then
 	  # We're converting our array to string to allow manipulation
 	  if ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor b8ca0eae9f47491ba257c422a2bc03fc37d13c22 HEAD ); then
-	    _staging_args=$( printf "%s" "${_staging_args[*]}" | sed 's/-W ntdll-NtAlertThreadByThreadId //' )
+	    _staging_args=$( printf "%s" "${_staging_args[*]}" | sed 's/-W ntdll-NtAlertThreadByThreadId // ; s/ -W ntdll-NtAlertThreadByThreadId// ; s/-W ntdll-NtAlertThreadByThreadId//' )
 	  else
 	    _staging_args=$( printf "%s" "${_staging_args[*]}" )
 	  fi
@@ -1965,8 +1964,10 @@ EOM
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ]; then
 	  # SDL Joystick support - from Proton
 	  if [ "$_sdl_joy_support" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ) && [ "$_use_staging" = "true" ]; then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor e4fbae832c868e9fcf5a91c58255fe3f4ea1cb30 HEAD ) && [ "$_use_staging" = "true" ]; then
 	      _patchname='proton-sdl-joy.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 6373792eec0f122295723cae77b0115e6c96c3e4 HEAD ) && [ "$_use_staging" = "true" ]; then
+	      _patchname='proton-sdl-joy-e4fbae8.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	      _patchname='proton-sdl-joy-6373792.patch' && _patchmsg="Enable SDL Joystick support (from Proton)" && nonuser_patcher
 	    elif git merge-base --is-ancestor 306c40e67319cae8e4c448ec8fc8d3996f87943f HEAD; then
@@ -2020,7 +2021,7 @@ EOM
 	    if git merge-base --is-ancestor bff6bc6a79ffc3a915219a6dfe64c9bcabaaeceb HEAD; then
 	      _patchname='proton-vr.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
 	    elif git merge-base --is-ancestor e447e86ae2fbfbd9dee1b488e38a653aaea5447e HEAD; then
-	      _patchname='proton-vr-bff6bc6a.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
+	      _patchname='proton-vr-bff6bc6.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
 	    elif git merge-base --is-ancestor a6d74b0545afcbf05d53fcbc9641ecc36c3be95c HEAD; then
 	      _patchname='proton-vr-e447e86.patch' && _patchmsg="Enable Proton vr-related wined3d additions" && nonuser_patcher
 	    elif git merge-base --is-ancestor c736321633c6a247b406be50b1780ca0439ef8b0 HEAD; then

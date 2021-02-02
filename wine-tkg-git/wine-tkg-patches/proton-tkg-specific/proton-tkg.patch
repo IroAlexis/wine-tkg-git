@@ -4260,153 +4260,97 @@ index 16a1541fd1d..08c84965566 100644
 +        [in] AudioObjectType type,
 +        [out] ISpatialAudioObject **object);
 +}
-From 1777861cae08f9915c1b8ea2535ada6e3aa911db Mon Sep 17 00:00:00 2001
-From: Zebediah Figura <z.figura12@gmail.com>
-Date: Wed, 20 Jan 2021 11:28:46 -0600
-Subject: [PATCH] ntdll: Use clock_gettime64 if supported.
+From f649de43236f67943a44ae89dfbbd3d4c7d9eeb4 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?R=C3=A9mi=20Bernon?= <rbernon@codeweavers.com>
+Date: Thu, 17 Dec 2020 18:47:44 +0100
+Subject: [PATCH] HACK: steam: winex11.drv: Check Steam overlay presence and
+ drop events when enabled.
 
 ---
- dlls/ntdll/unix/sync.c | 50 +++++++++++++++++++++++++++++++++++++-----
- server/request.c       | 50 +++++++++++++++++++++++++++++++++++++-----
- 2 files changed, 90 insertions(+), 10 deletions(-)
+ dlls/winex11.drv/event.c       | 7 ++++++-
+ dlls/winex11.drv/x11drv.h      | 1 +
+ dlls/winex11.drv/x11drv_main.c | 5 +++++
+ 3 files changed, 12 insertions(+), 1 deletion(-)
 
-diff --git a/dlls/ntdll/unix/sync.c b/dlls/ntdll/unix/sync.c
-index 5d70ef577ad..f665f91342d 100644
---- a/dlls/ntdll/unix/sync.c
-+++ b/dlls/ntdll/unix/sync.c
-@@ -82,6 +82,46 @@ static const LARGE_INTEGER zero_timeout;
- 
- static pthread_mutex_t addr_mutex = PTHREAD_MUTEX_INITIALIZER;
- 
-+#ifndef __NR_clock_gettime64
-+#define __NR_clock_gettime64 403
-+#endif
-+
-+struct timespec64
-+{
-+    long long tv_sec;
-+    long long tv_nsec;
-+};
-+
-+static inline int do_clock_gettime( clockid_t clock_id, ULONGLONG *ticks )
-+{
-+    static int clock_gettime64_supported = -1;
-+    struct timespec64 ts64;
-+    struct timespec ts;
-+    int ret;
-+
-+    if (clock_gettime64_supported < 0)
-+    {
-+        if (!syscall( __NR_clock_gettime64, clock_id, &ts64 ))
-+        {
-+            clock_gettime64_supported = 1;
-+            *ticks = ts64.tv_sec * (ULONGLONG)TICKSPERSEC + ts64.tv_nsec / 100;
-+            return 0;
-+        }
-+        clock_gettime64_supported = 0;
-+    }
-+
-+    if (clock_gettime64_supported)
-+    {
-+        if (!(ret = syscall( __NR_clock_gettime64, clock_id, &ts64 )))
-+            *ticks = ts64.tv_sec * (ULONGLONG)TICKSPERSEC + ts64.tv_nsec / 100;
-+        return ret;
-+    }
-+
-+    if (!(ret = clock_gettime( clock_id, &ts )))
-+        *ticks = ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
-+    return ret;
-+}
-+
- /* return a monotonic time counter, in Win32 ticks */
- static inline ULONGLONG monotonic_counter(void)
+diff --git a/dlls/winex11.drv/event.c b/dlls/winex11.drv/event.c
+index 89a9974529b..baec41d0296 100644
+--- a/dlls/winex11.drv/event.c
++++ b/dlls/winex11.drv/event.c
+@@ -433,13 +433,18 @@ static BOOL process_events( Display *display, Bool (*filter)(Display*, XEvent*,X
  {
-@@ -96,13 +136,13 @@ static inline ULONGLONG monotonic_counter(void)
- #endif
-     return mach_absolute_time() * timebase.numer / timebase.denom / 100;
- #elif defined(HAVE_CLOCK_GETTIME)
--    struct timespec ts;
-+    ULONGLONG ticks;
- #if 0
--    if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
--        return ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
-+    if (!do_clock_gettime( CLOCK_MONOTONIC_RAW, &ticks ))
-+        return ticks;
- #endif
--    if (!clock_gettime( CLOCK_MONOTONIC, &ts ))
--        return ts.tv_sec * (ULONGLONG)TICKSPERSEC + ts.tv_nsec / 100;
-+    if (!do_clock_gettime( CLOCK_MONOTONIC, &ticks ))
-+        return ticks;
- #endif
-     gettimeofday( &now, 0 );
-     return now.tv_sec * (ULONGLONG)TICKSPERSEC + now.tv_usec * 10 + TICKS_1601_TO_1970 - server_start_time;
-diff --git a/server/request.c b/server/request.c
-index f8aa63b03d1..e0c30c906dc 100644
---- a/server/request.c
-+++ b/server/request.c
-@@ -524,6 +524,46 @@ int send_client_fd( struct process *process, int fd, obj_handle_t handle )
-     return -1;
- }
+     XEvent event, prev_event;
+     int count = 0;
+-    BOOL queued = FALSE;
++    BOOL queued = FALSE, overlay_enabled = FALSE;
+     enum event_merge_action action = MERGE_DISCARD;
++    ULONG_PTR overlay_filter = QS_KEY | QS_MOUSEBUTTON | QS_MOUSEMOVE;
++
++    if (WaitForSingleObject(steam_overlay_event, 0) == WAIT_OBJECT_0)
++        overlay_enabled = TRUE;
  
-+#ifndef __NR_clock_gettime64
-+#define __NR_clock_gettime64 403
-+#endif
-+
-+struct timespec64
-+{
-+    long long tv_sec;
-+    long long tv_nsec;
-+};
-+
-+static inline int do_clock_gettime( clockid_t clock_id, ULONGLONG *ticks )
-+{
-+    static int clock_gettime64_supported = -1;
-+    struct timespec64 ts64;
-+    struct timespec ts;
-+    int ret;
-+
-+    if (clock_gettime64_supported < 0)
-+    {
-+        if (!syscall( __NR_clock_gettime64, clock_id, &ts64 ))
-+        {
-+            clock_gettime64_supported = 1;
-+            *ticks = ts64.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts64.tv_nsec / 100;
-+            return 0;
-+        }
-+        clock_gettime64_supported = 0;
-+    }
-+
-+    if (clock_gettime64_supported)
-+    {
-+        if (!(ret = syscall( __NR_clock_gettime64, clock_id, &ts64 )))
-+            *ticks = ts64.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts64.tv_nsec / 100;
-+        return ret;
-+    }
-+
-+    if (!(ret = clock_gettime( clock_id, &ts )))
-+        *ticks = ts.tv_sec * (ULONGLONG)TICKS_PER_SEC + ts.tv_nsec / 100;
-+    return ret;
-+}
-+
- /* return a monotonic time counter */
- timeout_t monotonic_counter(void)
- {
-@@ -537,13 +577,13 @@ timeout_t monotonic_counter(void)
- #endif
-     return mach_absolute_time() * timebase.numer / timebase.denom / 100;
- #elif defined(HAVE_CLOCK_GETTIME)
--    struct timespec ts;
-+    ULONGLONG ticks;
- #if 0
--    if (!clock_gettime( CLOCK_MONOTONIC_RAW, &ts ))
--        return (timeout_t)ts.tv_sec * TICKS_PER_SEC + ts.tv_nsec / 100;
-+    if (!do_clock_gettime( CLOCK_MONOTONIC_RAW, &ticks ))
-+        return ticks;
- #endif
--    if (!clock_gettime( CLOCK_MONOTONIC, &ts ))
--        return (timeout_t)ts.tv_sec * TICKS_PER_SEC + ts.tv_nsec / 100;
-+    if (!do_clock_gettime( CLOCK_MONOTONIC, &ticks ))
-+        return ticks;
- #endif
-     return current_time - server_start_time;
- }
+     prev_event.type = 0;
+     while (XCheckIfEvent( display, &event, filter, (char *)arg ))
+     {
+         count++;
++        if (overlay_enabled && filter_event( display, &event, (char *)overlay_filter )) continue;
+         if (XFilterEvent( &event, None ))
+         {
+             /*
+diff --git a/dlls/winex11.drv/x11drv.h b/dlls/winex11.drv/x11drv.h
+index 147087e3220..e4164eba5d2 100644
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -412,6 +412,7 @@ extern int xrender_error_base DECLSPEC_HIDDEN;
+ extern HMODULE x11drv_module DECLSPEC_HIDDEN;
+ extern char *process_name DECLSPEC_HIDDEN;
+ extern Display *clipboard_display DECLSPEC_HIDDEN;
++extern HANDLE steam_overlay_event DECLSPEC_HIDDEN;
+ 
+ /* atoms */
+ 
+diff --git a/dlls/winex11.drv/x11drv_main.c b/dlls/winex11.drv/x11drv_main.c
+index f23ce260a7f..17d80458c54 100644
+--- a/dlls/winex11.drv/x11drv_main.c
++++ b/dlls/winex11.drv/x11drv_main.c
+@@ -90,6 +90,7 @@ DWORD thread_data_tls_index = TLS_OUT_OF_INDEXES;
+ int xrender_error_base = 0;
+ HMODULE x11drv_module = 0;
+ char *process_name = NULL;
++HANDLE steam_overlay_event;
+ 
+ static x11drv_error_callback err_callback;   /* current callback for error */
+ static Display *err_callback_display;        /* display callback is set for */
+@@ -738,6 +739,10 @@ BOOL WINAPI DllMain( HINSTANCE hinst, DWORD reason, LPVOID reserved )
+         DisableThreadLibraryCalls( hinst );
+         x11drv_module = hinst;
+         ret = process_attach();
++        steam_overlay_event = CreateEventA(NULL, TRUE, FALSE, "__wine_steamclient_GameOverlayActivated");
++        break;
++    case DLL_PROCESS_DETACH:
++        CloseHandle(steam_overlay_event);
+         break;
+     }
+     return ret;
+From 2452b57e7fed9ac5036df9bcace5c28366a8eb41 Mon Sep 17 00:00:00 2001
+From: Andrew Eikum <aeikum@codeweavers.com>
+Date: Fri, 8 Jan 2021 13:47:39 -0600
+Subject: [PATCH] HACK: kernelbase: Add NFS EXE to Origin file blacklist hack
+
+---
+ dlls/kernelbase/file.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/dlls/kernelbase/file.c b/dlls/kernelbase/file.c
+index a33440107b6..397aa64dce2 100644
+--- a/dlls/kernelbase/file.c
++++ b/dlls/kernelbase/file.c
+@@ -741,7 +741,8 @@ static BOOL CALLBACK init_file_blacklist(PINIT_ONCE init_once, PVOID parameter,
+             L"igoproxy64.exe",
+             L"igoproxy.exe",
+             L"origin.exe",
+-            L"easteamproxy.exe"
++            L"easteamproxy.exe",
++            L"NFS11Remastered.exe"
+         };
+ 
+         WCHAR cur_exe[MAX_PATH];
