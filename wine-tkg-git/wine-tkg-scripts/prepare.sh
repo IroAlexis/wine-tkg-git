@@ -959,8 +959,10 @@ _prepare() {
 	#    _patchname='esync-unix-staging.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	#  fi
 	if [ "$_use_esync" = "true" ]; then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c6f2aacb5761801a17b930086111f4b2c4a30075 HEAD ); then
 	    _patchname='esync-unix-mainline.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
+	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	    _patchname='esync-unix-mainline-c6f2aac.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	    _patchname='esync-unix-mainline-44699c3.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
@@ -1320,8 +1322,10 @@ EOM
 	# fsync - experimental replacement for esync introduced with Proton 4.11-1
 	if [ "$_use_fsync" = "true" ]; then
 	  if [ "$_staging_esync" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c6f2aacb5761801a17b930086111f4b2c4a30075 HEAD ); then
 	      _patchname='fsync-unix-staging.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	      _patchname='fsync-unix-staging-c6f2aac.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	      _patchname='fsync-unix-staging-44699c3.patch' && _patchmsg="Applied fsync, an experimental replacement for esync (unix, staging)" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
@@ -1356,14 +1360,24 @@ EOM
 	    if [[ ! ${_staging_args[*]} =~ "server-Desktop_Refcount" ]] && ( cd "${srcdir}"/"${_stgsrcdir}" && ! git merge-base --is-ancestor 7fc716aa5f8595e5bca9206f86859f1ac70894ad HEAD ); then
 	      _patchname='fsync-staging-no_alloc_handle.patch' && _patchmsg="Added no_alloc_handle object method to fsync" && nonuser_patcher
 	      if ([ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]) || [ "$_protonify" = "true" ] && git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
-	        _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it-no_alloc_handle.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch (no_alloc_handle edition)" && nonuser_patcher
+	        if git merge-base --is-ancestor c6f2aacb5761801a17b930086111f4b2c4a30075 HEAD; then
+	          _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it-no_alloc_handle.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch (no_alloc_handle edition)" && nonuser_patcher
+	        else
+	          _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it-no_alloc_handle-c6f2aac.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch (no_alloc_handle edition)" && nonuser_patcher
+	        fi
 	      fi
 	    elif [ "$_protonify" = "true" ] && git merge-base --is-ancestor 2633a5c1ae542f08f127ba737fa59fb03ed6180b HEAD; then
-	      _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch" && nonuser_patcher
+	      if git merge-base --is-ancestor c6f2aacb5761801a17b930086111f4b2c4a30075 HEAD; then
+	        _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch" && nonuser_patcher
+	      else
+	        _patchname='server_Abort_waiting_on_a_completion_port_when_closing_it-c6f2aac.patch' && _patchmsg="Added Abort waiting on a completion port when closing it Proton patch" && nonuser_patcher
+	      fi
 	    fi
 	  elif [ "$_use_esync" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c6f2aacb5761801a17b930086111f4b2c4a30075 HEAD ); then
 	      _patchname='fsync-unix-mainline.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 44699c324f20690f9d6836919534ca1b5bcc3efe HEAD ); then
+	      _patchname='fsync-unix-mainline-c6f2aac.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 2b6426da6550c50787eeb2b39affcb766e07ec11 HEAD ); then
 	      _patchname='fsync-unix-mainline-44699c3.patch' && _patchmsg="Using Esync staging (unix) patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c1a042cefbc38eae6e0824a460a0657148e6745a HEAD ); then
@@ -1683,7 +1697,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "true" ] && [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor c6d85fc2178094840a5ea2cd4823c7b68e48e473 HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0027827290f4a411389e402eb2e1766d94e5e0c1 HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1745,7 +1759,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor d4bb0c4639aea2e8df80e577bd20b7f51c033e33 HEAD; then
+	    if git merge-base --is-ancestor c6d85fc2178094840a5ea2cd4823c7b68e48e473 HEAD; then
+	      _lastcommit="0027827"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor d4bb0c4639aea2e8df80e577bd20b7f51c033e33 HEAD; then
 	      _lastcommit="c6d85fc"
 	      _rpc="1"
 	      _stmbits="1"
