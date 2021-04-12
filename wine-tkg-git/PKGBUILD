@@ -1,11 +1,11 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=lunion-play-git
-pkgver=6.1.r6.ga2f82c5c
+pkgver=6.6.r0.g00aab804
 
 # workaround for pkgrel overwritten on regen
 pkgrel=1
-eval pkgrel=318
+eval pkgrel=324
 
 _stgsrcdir='wine-staging-git'
 _esyncsrcdir='esync'
@@ -119,6 +119,7 @@ makedepends=('git' 'autoconf' 'ncurses' 'bison' 'perl' 'fontforge' 'flex'
     'meson'                 'ninja'
     'glslang'               'wget'
     'ocl-icd'               'lib32-ocl-icd'
+    'jack2'                 'lib32-jack2'
     $_user_makedeps
 )
 
@@ -334,7 +335,7 @@ md5sums=('SKIP'
          'f063189ec090d9071397d455d271199d'
          '373b743313c927499a3336980274234b'
          '5b07ab957a128801b6c45e30b31432a7'
-         '897829bded3fbc33264b7d5a8eba4410'
+         '5ab8c70c4b01151688482ed52a522c9f'
          '528f610111d62158dc7c0578cbbb362e'
          'cf308e18ad3724e4872280ec35e25338'
          '8a6d9ad92d3becae6bd9dbb05d7d6f48'
@@ -407,20 +408,20 @@ md5sums=('SKIP'
          '5ca4ee142eafe2c8873d59b2feb51a7d'
          '684d1c60aa38a659b1dd792b1d7cd8f5'
          '9af1863e4bee2c6b5551a511897e8895'
-         '3378ad06e3621e29f357166d5c72177e'
+         '9f0d5ec5385defc4ef93517d48f682e2'
          '4df9cd990a78606d3cd0dc0673bb141f'
          'a784c182c65c20cbb29b6473abae171d'
          'f2db9103d6527377746540a9f8860c2f'
          '15995e43af57b18bf7b45cc2d5af4f2d'
          '6f7cc6eb54f700d57006897e8c50a6a3'
-         'cc5e0b424e9e13553df2e56efcc5f3de'
+         '4eaa63ebd5d268117791b5bdabc7106a'
          '7d9a7cf523c7283c64266148707b8bac'
-         '5a5b0fc01db1b795635c4f78af1a3419'
+         '1380b49c36bc762406badac4b97c6150'
          'f404adafc8648495270e01241cd0601e'
-         '1a224d6e86378e6600e7633a5de68255'
+         '314f8623529e51c4a76ec44ca2da1a7a'
          '3d5518c89320a59400774a86b9a1cf2f'
          '0310c86f736d1c9f35cdabdaedea9396'
-         'f69251f2931d5df0f0fb5adba28d4b78'
+         'a99af60f84ba6debbb477b12322ee562'
          'aa3d7083feafc62f0c6427e0b98c42e2'
          '3ac0f9d110f954cda629ccda21b95ed8'
          'b4a6fd86caa3b7a0c930f4d9b402e7cb'
@@ -432,14 +433,14 @@ md5sums=('SKIP'
          '18730b0f9bda4d2b73df668479b38027'
          '34e86644609f605adc76204b4fa58bed'
          '3d7f6a56676689c811f659c11a9f3f2d'
-         '9311e5387f0479e11abbb73e593a3297'
+         'b333f60eb26cc8b8afbe7b22821bf865'
          '87eb77f746f8c29bc8cff1d4dfce4bdc'
-         '21fdec6ec7011e8e3dd3ba451ec6a0e7'
-         '35fe66e7d56fc88cef7886df8d723109'
+         'e818c3c596b5c9e10a1561f807cf0655'
+         'ddf4b9957d86d9dcc6fb4893491a0146'
          '853baac75d041f8b1c4f3543b5ee47dd'
          '7a5d2d682248ca3367d4a299fdf6cf27'
-         '97b07302d7e276fa43c85264da51cec3'
-         '1d79a0acf124a7e9d7d317997b05a7e6')
+         '6d05eb9a910d693201f4e045284bb868'
+         'c901e211d5563c2a38a069860a52837a')
 
 if [ "$_EXTERNAL_INSTALL" = "true" ]; then
   provides=(
@@ -502,11 +503,13 @@ pkgver() {
 
 prepare() {
 	# Symlink legacy patches to srcdir
-	for _sympatch in "$_where"/*.patch; do
-	  if [[ ! "${source[@]##*/}" =~ "${_sympatch##*/}" ]]; then
-	    ln -s "$_sympatch" "$srcdir/"
-	  fi
-	done
+	if [ "$_NUKR" != "debug" ] || [[ "$_DEBUGANSW1" =~ [yY] ]]; then
+	  for _sympatch in "$_where"/*.patch; do
+	    if [[ ! "${source[@]##*/}" =~ "${_sympatch##*/}" ]]; then
+	      ln -s "$_sympatch" "$srcdir/"
+	    fi
+	  done
+	fi
 
 	# state tracker start - FEAR THE MIGHTY FROG MINER
 	touch "${_where}"/BIG_UGLY_FROGMINER
@@ -559,22 +562,20 @@ build() {
 
   # External install
   if [ "$_EXTERNAL_INSTALL" = "true" ]; then
-    if [ "$_EXTERNAL_INSTALL_TYPE" != "proton" ]; then
-      if [ "$_EXTERNAL_NOVER" = "true" ]; then
-        _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname"
+    if [ "$_EXTERNAL_NOVER" = "true" ]; then
+      _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname"
+    else
+      if [ "$_use_staging" = "true" ]; then
+        cd "$srcdir/$_stgsrcdir"
       else
-        if [ "$_use_staging" = "true" ]; then
-          cd "$srcdir/$_stgsrcdir"
-        else
-          cd "$srcdir/$_winesrcdir"
-        fi
-        _realwineversion=$(_describe_wine)
-        _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname-$_realwineversion"
+        cd "$srcdir/$_winesrcdir"
       fi
-    elif [ "$_EXTERNAL_INSTALL_TYPE" = "proton" ]; then
-      _prefix="$_where"
-      _configure_args+=(--without-curses)
+      _realwineversion=$(_describe_wine)
+      _prefix="$_DEFAULT_EXTERNAL_PATH/$pkgname-$_realwineversion"
     fi
+  elif [ "$_EXTERNAL_INSTALL" = "proton" ]; then
+    _prefix="$_where"
+    _configure_args+=(--without-curses)
   else
     _configure_args64+=(--libdir="$_prefix/$_lib64name")
     _configure_args32+=(--libdir="$_prefix/$_lib32name")

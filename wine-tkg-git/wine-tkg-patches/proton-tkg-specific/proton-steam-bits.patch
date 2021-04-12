@@ -42,9 +42,9 @@ index 5f9f61e2535..43cae2a2bc2 100644
  [Wow64Install.ntarm64]
  WineFakeDlls=FakeDllsWin32
 @@ -3867,6 +3870,22 @@ l_intl.nls
- winebus.inf,"@winebus.sys,-1"
- winehid.inf,"@winehid.sys,-1"
- wineusb.inf,"@wineusb.sys,-1"
+ winebus.inf,"@%12%\winebus.sys,-1"
+ winehid.inf,"@%12%\winehid.sys,-1"
+ wineusb.inf,"@%12%\wineusb.sys,-1"
 +
 +[SteamClient]
 +HKCU,Software\Valve\Steam,"SteamPath",,"%16422%\Steam"
@@ -326,30 +326,6 @@ index df2b43d9106..44ce3cd6639 100644
  [MCI]
  HKLM,%Mci32Str%,"AVIVideo",,"mciavi32.dll"
 
-From 059a15a1d521a6ba79273b2ade923822b1532205 Mon Sep 17 00:00:00 2001
-From: Andrew Eikum <aeikum@codeweavers.com>
-Date: Fri, 13 Jul 2018 10:40:27 -0500
-Subject: [PATCH] HACK: mshtml: Don't install wine-gecko on prefix creation
-
-We only want to install this on demand.
----
- dlls/mshtml/main.c | 2 --
- 1 file changed, 2 deletions(-)
-
-diff --git a/dlls/mshtml/main.c b/dlls/mshtml/main.c
-index 6ce8198aee5..f84d92cc860 100644
---- a/dlls/mshtml/main.c
-+++ b/dlls/mshtml/main.c
-@@ -530,8 +530,6 @@ HRESULT WINAPI DllRegisterServer(void)
-     hres = __wine_register_resources( hInst );
-     if(SUCCEEDED(hres))
-         hres = register_server(TRUE);
--    if(SUCCEEDED(hres))
--        load_gecko();
- 
-     return hres;
- }
-
 From 12b7edaf69d1f9c94c18bd4cd8ae0e1d5ae97972 Mon Sep 17 00:00:00 2001
 From: Andrew Eikum <aeikum@codeweavers.com>
 Date: Tue, 15 Jan 2019 10:10:47 -0600
@@ -363,12 +339,12 @@ diff --git a/dlls/ntdll/unix/env.c b/dlls/ntdll/unix/env.c
 index 74cea11be5f..50bc2321eaa 100644
 --- a/dlls/ntdll/unix/env.c
 +++ b/dlls/ntdll/unix/env.c
-@@ -437,6 +437,7 @@ static inline BOOL is_special_env_var( const char *var )
-             !strncmp( var, "TEMP=", sizeof("TEMP=")-1 ) ||
-             !strncmp( var, "TMP=", sizeof("TMP=")-1 ) ||
-             !strncmp( var, "QT_", sizeof("QT_")-1 ) ||
-+            !strncmp( var, "SDL_AUDIODRIVER=", sizeof("SDL_AUDIODRIVER=")-1 ) ||
-             !strncmp( var, "VK_", sizeof("VK_")-1 ));
+@@ -527,6 +527,7 @@ static BOOL is_special_env_var( const char *var )
+             STARTS_WITH( var, "TEMP=" ) ||
+             STARTS_WITH( var, "TMP=" ) ||
+             STARTS_WITH( var, "QT_" ) ||
++            STARTS_WITH( var, "SDL_AUDIODRIVER=" ) ||
+             STARTS_WITH( var, "VK_" ));
  }
  
 From 17d19e1b23bce6fc6ff5b4e61131c9c58fd57ae5 Mon Sep 17 00:00:00 2001
@@ -427,7 +403,7 @@ index 2b049eb91f8..e6948a73427 100644
  HKLM,"System\CurrentControlSet\Services\Eventlog\System","Sources",0x10000,""
  HKLM,"System\CurrentControlSet\Services\Tcpip\Parameters","DataBasePath",2,"%11%\drivers"
 
-From aef0f1638ce13db03a4d3c0fe53972f44443c854 Mon Sep 17 00:00:00 2001
+From 80b9333ff296062b4b0c34f7e3509530dd331993 Mon Sep 17 00:00:00 2001
 From: Patryk Obara <dreamer.tan@gmail.com>
 Date: Fri, 26 Apr 2019 20:40:31 +0200
 Subject: [PATCH] winex11: Fill WM_CLASS based on Steam appid
@@ -435,13 +411,13 @@ Subject: [PATCH] winex11: Fill WM_CLASS based on Steam appid
 Some desktop environments (Gnome 3, Cinnamon) decide on an application
 icon in the following order:
 
- - If the first string in WM_CLASS property can be correlated to
+- If the first string in WM_CLASS property can be correlated to
   a name or StartupWMClass key in a .desktop entry file, then
   the associated icon will be used.
- - If the second string in WM_CLASS property can be correlated to
+- If the second string in WM_CLASS property can be correlated to
   a name or StartupWMClass key in a .desktop entry file, then
   the associated icon will be used.
- - If the application has indicated an icon resource through WM_HINTS
+- If the application has indicated an icon resource through WM_HINTS
   property, then the associated X window or pixmaps will be used.
 
 Upstream Wine usually deals with this by placing a .desktop file with
@@ -458,25 +434,32 @@ Steam can override this behaviour by installing properly crafted
 .desktop entry file.  If SteamAppId environment variable is missing,
 then generic "steam_proton" name is used instead.
 ---
- dlls/winex11.drv/window.c | 7 +++++--
- 1 file changed, 5 insertions(+), 2 deletions(-)
+ dlls/winex11.drv/window.c | 15 +++++++++++++--
+ 1 file changed, 13 insertions(+), 2 deletions(-)
 
 diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
-index 1ec7c706511..9ae3da3d4a2 100644
+index cee4230e1bb..46d46052796 100644
 --- a/dlls/winex11.drv/window.c
 +++ b/dlls/winex11.drv/window.c
-@@ -870,8 +870,13 @@ static void set_initial_wm_hints( Display *display, Window window )
+@@ -941,8 +941,19 @@ static void set_initial_wm_hints( Display *display, Window window )
      /* class hints */
      if ((class_hints = XAllocClassHint()))
      {
-+        static char steam_proton[] = "steam_proton";
-+        char proton_app_class[128];
-+        const char *app_id = getenv("SteamAppId");
-+
-+        snprintf(proton_app_class, sizeof(proton_app_class), "steam_app_%s", app_id);
-         class_hints->res_name = process_name;
+-        class_hints->res_name = process_name;
 -        class_hints->res_class = process_name;
-+        class_hints->res_class = app_id ? proton_app_class : steam_proton;
++        static char steam_proton[] = "steam_proton";
++        const char *app_id = getenv("SteamAppId");
++        char proton_app_class[128];
++
++        if(app_id && *app_id){
++            snprintf(proton_app_class, sizeof(proton_app_class), "steam_app_%s", app_id);
++            class_hints->res_name = proton_app_class;
++            class_hints->res_class = proton_app_class;
++        }else{
++            class_hints->res_name = steam_proton;
++            class_hints->res_class = steam_proton;
++        }
++
          XSetClassHint( display, window, class_hints );
          XFree( class_hints );
      }

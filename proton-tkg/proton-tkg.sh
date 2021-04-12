@@ -146,12 +146,14 @@ function build_lsteamclient {
   export PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
   if [[ "$_proton_branch" != proton_3.* ]] && [[ "$_proton_branch" != proton_4.* ]]; then
     _cxx_addon="-std=gnu++11"
-    if [ "$_standard_dlopen" = "true" ] && [ "$_proton_branch" != "proton_5.13" ]; then
+    if [ "$_proton_branch" = "proton_5.0" ] && [ "$_standard_dlopen" = "true" ]; then
       patch -Np1 < "$_nowhere/proton_template/steamclient-remove-library.h-dep.patch" || true
       patch -Np1 < "$_nowhere/proton_template/steamclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch" || true
       WINEMAKERFLAGS+=" -ldl"
     elif [ "$_proton_branch" = "proton_5.13" ]; then
       patch -Np1 < "$_nowhere/proton_template/steamclient-remove-library.h-dep.patch" || true
+      WINEMAKERFLAGS+=" -ldl"
+    else
       WINEMAKERFLAGS+=" -ldl"
     fi
   fi
@@ -191,7 +193,7 @@ function build_vkd3d {
 
   _user_patches_no_confirm="true"
   _userpatch_target="vkd3d-proton"
-  _userpatch_ext="vkd3d"
+  _userpatch_ext="myvkd3d"
   proton_patcher
 
   rm -rf build/lib64-vkd3d
@@ -233,6 +235,11 @@ function build_dxvk {
 }
 
 function build_steamhelper {
+  # disable openvr support for now since we don't support it
+  if [ "$_proton_branch" = "proton_6.3" ]; then
+    ( cd Proton && patch -Np1 -R < "$_nowhere/proton_template/steamhelper_revert_openvr-support.patch" || true )
+  fi
+
   if [[ $_proton_branch != proton_3.* ]]; then
     source "$_nowhere/proton_tkg_token"
     rm -rf Proton/build/steam.win32
@@ -240,10 +247,12 @@ function build_steamhelper {
     cp -a Proton/steam_helper/* Proton/build/steam.win32
     cd Proton/build/steam.win32
 
-    if [ "$_proton_branch" = "proton_4.2" ] || [ "$_proton_branch" = "proton_5.0" ] || [ "$_proton_branch" = "proton_5.13" ]; then
+    if [ "$_proton_branch" = "proton_4.11" ]; then
+      export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/wine/msvcrt/ -I$_nowhere/proton_dist_tmp/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
+    elif [ "$_proton_branch" = "proton_4.2" ] || [ "$_proton_branch" = "proton_5.0" ] || [ "$_proton_branch" = "proton_5.13" ]; then
       export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --nomsvcrt --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
     else
-      export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/wine/msvcrt/ -I$_nowhere/proton_dist_tmp/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
+      export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --nomsvcrt --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/ -I$_wine_tkg_git_path/src/$_winesrcdir/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
     fi
 
     winemaker $WINEMAKERFLAGS --guiexe -lsteam_api -lole32 -I"$_nowhere/Proton/build/lsteamclient.win32/steamworks_sdk_142/" -L"$_nowhere/Proton/steam_helper" .

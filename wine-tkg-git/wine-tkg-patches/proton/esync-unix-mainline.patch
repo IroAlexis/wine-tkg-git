@@ -808,8 +808,8 @@ index 2a47abf342c..0f072a5846e 100644
      CloseHandle(signaled);
      CloseHandle(nonsignaled);
  }
-@@ -2702,6 +3078,84 @@ static void test_crit_section(void)
-     ok(cs.DebugInfo == NULL, "Unexpected debug info pointer %p.\n", cs.DebugInfo);
+@@ -2702,6 +3078,84 @@ static void test_QueueUserAPC(void)
+     CloseHandle(thread);
  }
  
 +static int zigzag_state, zigzag_count[2], zigzag_stop;
@@ -2343,7 +2343,7 @@ index 33859dabf41..19b73256ef2 100644
 +    esync_init();
      virtual_map_user_shared_data();
      init_cpu_info();
-     init_files();
+     syscall_dispatcher = signal_init_syscalls();
 diff --git a/dlls/ntdll/unix/server.c b/dlls/ntdll/unix/server.c
 index e12ed3a668a..34d4c80eee5 100644
 --- a/dlls/ntdll/unix/server.c
@@ -2375,8 +2375,8 @@ index e12ed3a668a..34d4c80eee5 100644
      struct iovec vec;
      struct msghdr msghdr;
 @@ -1697,6 +1698,9 @@ NTSTATUS WINAPI NtClose( HANDLE handle )
-     NTSTATUS ret;
-     int fd = remove_fd_from_cache( handle );
+      * retrieve it again */
+     fd = remove_fd_from_cache( handle );
  
 +    if (do_esync())
 +        esync_close( handle );
@@ -3680,7 +3680,7 @@ index 9d8af7c87ea..8607b494b6d 100644
  
  static const WCHAR event_name[] = {'E','v','e','n','t'};
  
-@@ -42,14 +43,17 @@ struct event
+@@ -42,13 +43,16 @@ struct event
      struct list    kernel_object;   /* list of kernel object pointers */
      int            manual_reset;    /* is it a manual reset event? */
      int            signaled;        /* event has been signaled */
@@ -3691,7 +3691,6 @@ index 9d8af7c87ea..8607b494b6d 100644
  static int event_signaled( struct object *obj, struct wait_queue_entry *entry );
  static void event_satisfied( struct object *obj, struct wait_queue_entry *entry );
 +static int event_get_esync_fd( struct object *obj, enum esync_type *type );
- static unsigned int event_map_access( struct object *obj, unsigned int access );
  static int event_signal( struct object *obj, unsigned int access);
  static struct list *event_get_kernel_obj_list( struct object *obj );
 +static void event_destroy( struct object *obj );
@@ -3906,7 +3905,7 @@ index e5a4be7a3df..bbc2462163d 100644
 +        esync_clear( fd->esync_fd );
  }
  
- /* handler for close_handle that refuses to close fd-associated handles in other processes */
+ /* check if events are pending and if yes return which one(s) */
 @@ -2203,6 +2223,15 @@ int default_fd_signaled( struct object *obj, struct wait_queue_entry *entry )
      return ret;
  }
@@ -3920,9 +3919,9 @@ index e5a4be7a3df..bbc2462163d 100644
 +    return ret;
 +}
 +
- /* default map_access() routine for objects that behave like an fd */
- unsigned int default_fd_map_access( struct object *obj, unsigned int access )
+ int default_fd_get_poll_events( struct fd *fd )
  {
+     int events = 0;
 diff --git a/server/file.c b/server/file.c
 index 23b6de275cd..49c4ba32b42 100644
 --- a/server/file.c
@@ -3944,9 +3943,9 @@ index bcbdea5b8ce..cae0ac1e395 100644
  
  extern int default_fd_signaled( struct object *obj, struct wait_queue_entry *entry );
 +extern int default_fd_get_esync_fd( struct object *obj, enum esync_type *type );
- extern unsigned int default_fd_map_access( struct object *obj, unsigned int access );
  extern int default_fd_get_poll_events( struct fd *fd );
  extern void default_poll_event( struct fd *fd, int event );
+ extern void fd_queue_async( struct fd *fd, struct async *async, int type );
 diff --git a/server/handle.c b/server/handle.c
 index c1fb4a490a9..cb5628b7e06 100644
 --- a/server/handle.c
@@ -4189,9 +4188,9 @@ index 1b6ddb1b982..df50955f621 100644
      return process;
  
 @@ -645,6 +654,7 @@ static void process_destroy( struct object *obj )
-     if (process->id) free_ptid( process->id );
      if (process->token) release_object( process->token );
      free( process->dir_cache );
+     free( process->image );
 +    if (do_esync()) close( process->esync_fd );
  }
  
@@ -4209,7 +4208,7 @@ index 1b6ddb1b982..df50955f621 100644
 +
  static unsigned int process_map_access( struct object *obj, unsigned int access )
  {
-     if (access & GENERIC_READ)    access |= STANDARD_RIGHTS_READ | PROCESS_QUERY_INFORMATION | PROCESS_VM_READ;
+     access = default_map_access( obj, access );
 diff --git a/server/process.h b/server/process.h
 index 56092e5b1ac..eec69ddbcaf 100644
 --- a/server/process.h
@@ -4476,13 +4475,13 @@ index 07e1cf3a2ca..c2dfa8fb8ce 100644
 @@ -172,6 +172,7 @@ static const struct object_ops sock_ops =
      add_queue,                    /* add_queue */
      remove_queue,                 /* remove_queue */
-     sock_signaled,                /* signaled */
+     default_fd_signaled,          /* signaled */
 +    NULL,                         /* get_esync_fd */
      no_satisfied,                 /* satisfied */
      no_signal,                    /* signal */
      sock_get_fd,                  /* get_fd */
 @@ -1173,6 +1174,7 @@ static const struct object_ops ifchange_ops =
-     add_queue,               /* add_queue */
+     no_add_queue,            /* add_queue */
      NULL,                    /* remove_queue */
      NULL,                    /* signaled */
 +    NULL,                    /* get_esync_fd */
@@ -4598,7 +4597,7 @@ index 0e916e181bc..1a245c58396 100644
 +
  static unsigned int thread_map_access( struct object *obj, unsigned int access )
  {
-     if (access & GENERIC_READ)    access |= STANDARD_RIGHTS_READ | THREAD_QUERY_INFORMATION | THREAD_GET_CONTEXT;
+     access = default_map_access( obj, access );
 @@ -1045,6 +1068,9 @@ void wake_up( struct object *obj, int max )
      struct list *ptr;
      int ret;
@@ -4679,8 +4678,8 @@ index 9aba550fd93..dcbc9e2ece5 100644
  static int timer_signaled( struct object *obj, struct wait_queue_entry *entry );
 +static int timer_get_esync_fd( struct object *obj, enum esync_type *type );
  static void timer_satisfied( struct object *obj, struct wait_queue_entry *entry );
- static unsigned int timer_map_access( struct object *obj, unsigned int access );
  static void timer_destroy( struct object *obj );
+ 
 @@ -65,6 +68,7 @@ static const struct object_ops timer_ops =
      add_queue,                 /* add_queue */
      remove_queue,              /* remove_queue */
