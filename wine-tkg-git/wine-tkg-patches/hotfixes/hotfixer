@@ -498,7 +498,11 @@ else
     _proton_rawinput="false"
     _steamvr_support="false" # We'll need to update the patchset
     # Something gets frogged somewhere with this. Using standard CRT memory allocators in the fs hack breaks, so let's selectively revert a27d5bae114eef5352b699ee38975bc8793b4dcb until we figure it out.
-    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 187e4d7e2f50661ae626da3071996fe66a9b2e31 HEAD ); then
+    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 9c1d52dff463109cd91d5f1d0048bb9eb54efbb4 HEAD ); then
+      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/free_invalid_size/winevulkan_Use_standard_CRT_memory_allocators4)
+    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 171fe51b794f51b8d2b3811b7327aa2e730cd07e HEAD ); then
+      _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/free_invalid_size/winevulkan_Use_standard_CRT_memory_allocators3)
+    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 187e4d7e2f50661ae626da3071996fe66a9b2e31 HEAD ); then
       _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/free_invalid_size/winevulkan_Use_standard_CRT_memory_allocators2)
     elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 62cb6ace2cfe46358e6526868145a5bd8a7f990b HEAD ); then
       _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/free_invalid_size/winevulkan_Use_standard_CRT_memory_allocators1)
@@ -529,7 +533,9 @@ fi
 # Selective reverts to fix steamclent swap on proton - Unsure how to port the hack over, so any help is appreciated
 if [ "$_EXTERNAL_INSTALL" = "proton" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor bb065801a693e1cd305d2a507c206f1b21a142d3 HEAD ); then
   warning "Hotfix: Fix for steamclient swap breakage"
-  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 277a5728da6cdce0247521dc63b324e120b542d6 HEAD ); then
+  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor aaa501fe93fb7140b472850060d652613406307f HEAD ); then
+    _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/steamclient_swap/revert_steamclient_breaker5)
+  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 277a5728da6cdce0247521dc63b324e120b542d6 HEAD ); then
     _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/steamclient_swap/revert_steamclient_breaker4)
   elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0bbbf016b1eb1c90a98c58afc2760319050a04d3 HEAD ); then
     _hotfixes+=("$_where"/wine-tkg-patches/hotfixes/steamclient_swap/revert_steamclient_breaker3)
