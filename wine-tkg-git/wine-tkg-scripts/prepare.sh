@@ -99,6 +99,36 @@ _cfgstring() {
   fi
 }
 
+update_configure() {
+  _file="./configure"
+
+  if ! cp -a "$_file" "$_file.old"; then
+    abort "failed to create $_file.old"
+  fi
+
+  if ! autoreconf -f; then
+    rm "$_file.old"
+    unset _file
+    return 1
+  fi
+
+  # This is undefined behaviour when off_t is 32-bit, see https://launchpad.net/ubuntu/+source/autoconf/2.69-6
+  # GE has reported RDR2 online issues with the fix applied (which staging applies), so let's restore the broken ways
+  sed -i'' -e "s|^#define LARGE_OFF_T ((((off_t) 1 << 31) << 31) - 1 + (((off_t) 1 << 31) << 31))\$|#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))|g" "$_file"
+  sed -i'' -e "s|^#define LARGE_OFF_T (((off_t) 1 << 31 << 31) - 1 + ((off_t) 1 << 31 << 31))\$|#define LARGE_OFF_T (((off_t) 1 << 62) - 1 + ((off_t) 1 << 62))|g" "$_file"
+  unset _large_off_old _large_off_new
+
+  # Restore original timestamp when nothing changed
+  if ! cmp "$_file.old" "$_file" >/dev/null; then
+    rm "$_file.old"
+  else
+    mv "$_file.old" "$_file"
+  fi
+
+  unset _file
+  return 0
+}
+
 _init() {
 msg2 '       .---.`               `.---.'
 msg2 '    `/syhhhyso-           -osyhhhys/`'
@@ -1728,11 +1758,17 @@ EOM
 	    else
 	      _patchname='legacy-LAA.patch' && _patchmsg="Applied large address aware override support (legacy)" && nonuser_patcher
 	    fi
-	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7512c53b89308c16a512cb8f0c1d0fd6ff02b17b HEAD ); then
+	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 72c562ce9c481e73a01f50e17b624095aab11bdc HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      _patchname='LAA-unix-staging.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
 	    else
 	      _patchname='LAA-unix.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
+	    fi
+	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 7512c53b89308c16a512cb8f0c1d0fd6ff02b17b HEAD ); then
+	    if [ "$_use_staging" = "true" ]; then
+	      _patchname='LAA-unix-staging-72c562c.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
+	    else
+	      _patchname='LAA-unix-72c562c.patch' && _patchmsg="Applied large address aware override support" && nonuser_patcher
 	    fi
 	  elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
@@ -1786,7 +1822,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 11daf1869078a60ed2588ff5a61a4d9b27985beb HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 72c562ce9c481e73a01f50e17b624095aab11bdc HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1864,7 +1900,11 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor 7ef35b33936682c01f1c825b7d1b07567a691c12 HEAD; then
+	    if git merge-base --is-ancestor 11daf1869078a60ed2588ff5a61a4d9b27985beb HEAD; then
+	      _lastcommit="72c562c"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 7ef35b33936682c01f1c825b7d1b07567a691c12 HEAD; then
 	      _lastcommit="11daf18"
 	      _rpc="1"
 	      _stmbits="1"
@@ -2344,6 +2384,7 @@ EOM
 	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 74c0da2d71e95f3e6bd6c8b440652933771b27d7 HEAD );then
 	    if [ "$_use_staging" = "true" ]; then
 	      _patchname='proton-bcrypt-staging.patch' && _patchmsg="Using Proton Bcrypt patches" && nonuser_patcher
+	      ( cd "${srcdir}"/"${_winesrcdir}" && update_configure )
 	    fi
 	  fi
 	fi
