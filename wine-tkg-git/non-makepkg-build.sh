@@ -25,8 +25,8 @@ _esyncsrcdir='esync'
 _where="$PWD" # track basedir as different Arch based distros are moving srcdir around
 
 # set srcdir, Arch style
-mkdir -p "$_where"/src
-srcdir="$_where"/src
+mkdir -p /tmp/src
+srcdir=/tmp/src
 
 # use msg2, error and pkgver funcs for compat
 msg2() {
