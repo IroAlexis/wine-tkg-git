@@ -43,8 +43,10 @@ fi
 
 if [ "$_ispkgbuild" = "true" ]; then
   _wine_tkg_git_path="${_nowhere}/../../wine-tkg-git"
+  _logdir="$_nowhere/.."
 else
   _wine_tkg_git_path="${_nowhere}/../wine-tkg-git" # Change to wine-tkg-git path if needed
+  _logdir="$_nowhere"
 
   # Set Steam root path
   if [ -d "$HOME/.steam/root" ]; then # typical on Arch
@@ -465,13 +467,7 @@ else
   # We'll need a token to register to wine-tkg-git - keep one for us to steal wine-tkg-git options later
   echo -e "_proton_tkg_path='${_nowhere}'\n_no_steampath='${_no_steampath}'" > proton_tkg_token && cp proton_tkg_token "${_wine_tkg_git_path}/"
 
-  if [ "$_ispkgbuild" = "true" ]; then
-    _logdir="$_nowhere/.."
-  else
-    _logdir="$_nowhere"
-  fi
-
-  echo -e "Proton-tkg - $(date +"%m-%d-%Y %H:%M:%S")}" > "$_logdir"/proton-tkg.log
+  echo -e "Proton-tkg - $(date +"%m-%d-%Y %H:%M:%S")" > "$_logdir"/proton-tkg.log
 
   # Now let's build
   cd "$_wine_tkg_git_path"
@@ -676,26 +672,33 @@ else
     # Patch our proton script to make use of the steam helper on 4.0+
     if [[ $_proton_branch != proton_3.* ]] && [ "$_proton_use_steamhelper" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/steam.exe.patch" || exit 1
+      _patchname="steam.exe.patch"
+      echo "\nApplying $_patchname"
+      patch -Np1 < "$_nowhere/proton_template/$_patchname" || exit 1
       cd "$_nowhere"
     fi
 
     # Patch our proton script to allow for VR support
     if [ "$_steamvr_support" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/vr-support.patch" || exit 1
+      _patchname="vr-support.patch"
+      echo "\nApplying $_patchname"
+      patch -Np1 < "$_nowhere/proton_template/$_patchname" || exit 1
       cd "$_nowhere"
     fi
 
     # Patch our proton script to handle minimal d3d10 implementation for dxvk on Wine 5.3+
     if [ "$_dxvk_minimald3d10" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
+      echo "\nApplying $_patchname"
       patch -Np1 < "$_nowhere/proton_template/dxvk_minimald3d10.patch" || exit 1
       cd "$_nowhere"
       # Patch our proton script to handle dxvk_config lib
       if [ -e "$_nowhere"/dxvk/x64/dxvk_config.dll ]; then
         cd "$_nowhere/proton_tkg_$_protontkg_version"
-        patch -Np1 < "$_nowhere/proton_template/dxvk_config_support.patch" || exit 1
+        _patchname="dxvk_config_support.patch"
+        echo "\nApplying $_patchname"
+        patch -Np1 < "$_nowhere/proton_template/$_patchname" || exit 1
         cd "$_nowhere"
       fi
     fi
@@ -703,12 +706,15 @@ else
     # Patch our makepkg version of the proton script to not create default prefix and use /tmp/dist.lock
     if [ "$_ispkgbuild" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
-      patch -Np1 < "$_nowhere/proton_template/makepkg_adjustments.patch" || exit 1
+      _patchname="makepkg_adjustments.patch"
+      echo "\nApplying $_patchname"
+      patch -Np1 < "$_nowhere/proton_template/$_patchname" || exit 1
       cd "$_nowhere"
     fi
 
     # Patch our proton script to remove mfplay dll override when _proton_mf_hacks is disabled
     if [ "$_proton_mf_hacks" != "true" ]; then
+      echo "\nUsing prebuilt mfplay"
       sed -i '/.*#disable built-in mfplay.*/d' "proton_tkg_$_protontkg_version/proton"
     fi
 
@@ -778,12 +784,12 @@ else
     else
       _alt_start_vercheck=$( echo "$_protontkg_version" | cut -f1,2 -d'.' )
     fi
-    [ ${_alt_start_vercheck//./} -le 66 ] && sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | msg2 "Disable alt start"
+    [ ${_alt_start_vercheck//./} -le 66 ] && sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
 
-    echo -e "Full version: $_protontkg_version\nStripped version: ${_alt_start_vercheck//./}" > "$_logdir"/proton-tkg.log
+    echo -e "Full version: $_protontkg_version\nStripped version: ${_alt_start_vercheck//./}" >> "$_logdir"/proton-tkg.log
 
     # pefixup
-    if [[ $_proton_branch != proton_3* ]] && [[ $_proton_branch != proton_4* ]] && [[ $_proton_branch != proton_5* ]]; then
+    if [[ $_proton_branch != proton_3* ]] && [[ $_proton_branch != proton_4* ]] && [[ $_proton_branch != proton_5* ]] && [ ${_alt_start_vercheck//./} -ge 66 ]; then
       echo ''
       echo "Fixing PE files..."
       find "$_nowhere"/"proton_tkg_$_protontkg_version"/ -type f -name "*.dll" -printf "%p\0" | xargs --verbose -0 -r -P8 -n3 "$_nowhere/proton_template/pefixup.py" >>"$_logdir"/proton-tkg.log 2>&1

@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=6.7.r6.g977e5237
+pkgver=6.7.r7.g4d8896cc
 pkgrel=1
 _frogwhere="$PWD"
 # Arch chroot workaround
@@ -207,7 +207,7 @@ package() {
   cd "${srcdir}"
   rm -f proton_tkg_token
 
-  recursive_installer proton_tkg_* "${pkgdir}/usr/share/steam/compatibilitytools.d" >>"$_logdir"/proton-tkg.log 2>&1
+  recursive_installer proton_tkg_* "${pkgdir}/usr/share/steam/compatibilitytools.d" >>"${_frogwhere}"/proton-tkg.log 2>&1
 
   cd "${pkgdir}"/usr/share/steam/compatibilitytools.d/proton_tkg_*
   ln -s -f "/tmp" "__pycache__"
