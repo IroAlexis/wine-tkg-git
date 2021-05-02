@@ -1,4 +1,3 @@
-
 diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index e919d7e2671..160a16daff8 100644
 --- a/dlls/ntdll/loader.c
