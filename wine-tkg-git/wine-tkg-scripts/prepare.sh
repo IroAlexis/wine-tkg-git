@@ -57,6 +57,7 @@ _exit_cleanup() {
     if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 1e478b804f72a9b5122fc6adafac5479b816885e HEAD ) && [ "$_dxvk_minimald3d10" != "false" ]; then
       echo "_dxvk_minimald3d10='true'" >> "$_proton_tkg_path"/proton_tkg_token
     fi
+    echo "_new_lib_paths='${_new_lib_paths}'" >> "$_proton_tkg_path"/proton_tkg_token
   fi
 
   rm -f "$_where"/BIG_UGLY_FROGMINER && msg2 'Removed BIG_UGLY_FROGMINER - Ribbit' # state tracker end
@@ -825,6 +826,12 @@ _prepare() {
 	  _staging_args+=(-W dinput-SetActionMap-genre -W dinput-axis-recalc -W dinput-joy-mappings -W dinput-reconnect-joystick -W dinput-remap-joystick)
 	fi
 
+	# We want to track builds using the new lib paths - introduced with 0aa335b1060428f5f799c93e3c6dea2bc2dd864a-79a148e1fa8b5ada2dc8fec03cf866a3d78c0d54
+	if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 79a148e1fa8b5ada2dc8fec03cf866a3d78c0d54 HEAD ) && [ "$_new_lib_paths_override" != "true" ]; then
+	  _new_lib_paths="true"
+	  _proton_use_steamhelper="false" # The helper breaks with those changes, failing to load steam.exe.so. Let's disable it for now.
+	fi
+
 	# Fixes for staging based Proton + steamhelper
 	if ( [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_use_staging" = "true" ] && [ "$_proton_use_steamhelper" = "true" ] ); then
 	  if ( cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
@@ -923,7 +930,12 @@ _prepare() {
 	# Child window support for vk - Fixes World of Final Fantasy and others - https://bugs.winehq.org/show_bug.cgi?id=45277
 	if [ "$_childwindow_fix" = "true" ]; then
 	  if ( [ "$_proton_fs_hack" != "true" ] && git merge-base --is-ancestor 0f972e2247932f255f131792724e4796b4b2b87a HEAD ) || ( ! git merge-base --is-ancestor 0f972e2247932f255f131792724e4796b4b2b87a HEAD ); then
-	    _patchname='childwindow.patch' && _patchmsg="Applied child window for vk patch" && nonuser_patcher
+	    if git merge-base --is-ancestor 011fabb2c43d13402ea18b6ea7be3669b5e6c7a8 HEAD; then
+	      _staging_args+=(-W Pipelight -W winex11-Vulkan_support)
+	      _patchname='childwindow.patch' && _patchmsg="Applied child window for vk patch" && nonuser_patcher
+	    else
+	      _patchname='childwindow-011fabb.patch' && _patchmsg="Applied child window for vk patch" && nonuser_patcher
+	    fi
 	  fi
 	fi
 
@@ -1824,7 +1836,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 5d82baf9747b7b133cad3be77c0cc9e24cc09582 HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 9ca95e32651d6a50dc787af4dc53fb907f1c4e2b HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1902,7 +1914,15 @@ EOM
 	      fi
 	    fi
 	  else
-	    if git merge-base --is-ancestor 02e3327f0687559486739f7da7b602c2baae070a HEAD; then
+	    if git merge-base --is-ancestor ec9f3119306e34f5a8bd3bfeb233eed740c1c6ae HEAD; then
+	      _lastcommit="9ca95e3"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 5d82baf9747b7b133cad3be77c0cc9e24cc09582 HEAD; then
+	      _lastcommit="ec9f311"
+	      _rpc="1"
+	      _stmbits="1"
+	    elif git merge-base --is-ancestor 02e3327f0687559486739f7da7b602c2baae070a HEAD; then
 	      _lastcommit="5d82baf"
 	      _rpc="1"
 	      _stmbits="1"
