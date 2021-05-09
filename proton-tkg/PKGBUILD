@@ -1,7 +1,7 @@
 # Created by: Tk-Glitch <ti3nou at gmail dot com>
 
 pkgname=proton-tkg-git
-pkgver=6.7.r16.g046b1ab2
+pkgver=6.8.r0.g0f00e37c
 pkgrel=1
 _frogwhere="$PWD"
 # Arch chroot workaround
@@ -70,7 +70,7 @@ makedepends=(
     'opencl-headers'        'mingw-w64-gcc'
     'vulkan-headers'        'jack2'
     'lib32-jack2'           'python-pefile'
-    $_user_makedeps
+    'rust'                  $_user_makedeps
 )
 optdepends=(
     'giflib'                'lib32-giflib'

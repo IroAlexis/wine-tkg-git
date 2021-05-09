@@ -1,3 +1,16 @@
+diff --git a/dlls/ntdll/unix/env.c b/dlls/ntdll/unix/env.c
+index 3ac1ed9ab63..5d8c14625f9 100644
+--- a/dlls/ntdll/unix/env.c
++++ b/dlls/ntdll/unix/env.c
+@@ -1954,6 +1954,8 @@ static RTL_USER_PROCESS_PARAMETERS *build_initial_params(void)
+     if (!status)
+     {
+         if (main_image_info.ImageCharacteristics & IMAGE_FILE_DLL) status = STATUS_INVALID_IMAGE_FORMAT;
++        if (main_image_info.ImageFlags & IMAGE_FLAGS_ComPlusNativeReady)
++            main_image_info.Machine = native_machine;
+         if (main_image_info.Machine != current_machine) status = STATUS_INVALID_IMAGE_FORMAT;
+     }
+ 
 diff --git a/dlls/ntdll/loader.c b/dlls/ntdll/loader.c
 index e919d7e2671..160a16daff8 100644
 --- a/dlls/ntdll/loader.c

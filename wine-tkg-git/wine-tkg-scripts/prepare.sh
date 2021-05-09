@@ -829,7 +829,6 @@ _prepare() {
 	# We want to track builds using the new lib paths - introduced with 0aa335b1060428f5f799c93e3c6dea2bc2dd864a-79a148e1fa8b5ada2dc8fec03cf866a3d78c0d54
 	if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 79a148e1fa8b5ada2dc8fec03cf866a3d78c0d54 HEAD ) && [ "$_new_lib_paths_override" != "true" ]; then
 	  _new_lib_paths="true"
-	  _proton_use_steamhelper="false" # The helper breaks with those changes, failing to load steam.exe.so. Let's disable it for now.
 	fi
 
 	# Fixes for staging based Proton + steamhelper
@@ -2224,6 +2223,9 @@ EOM
 	    else
 	      _patchname='proton-pa-staging-fa6d22b.patch' && _patchmsg="Enable Proton's PA additions" && nonuser_patcher
 	    fi
+	  fi
+	  if [ "$_EXTERNAL_INSTALL" = "proton" ] && ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 9ca95e32651d6a50dc787af4dc53fb907f1c4e2b HEAD ); then
+	    _patchname='proton-gstreamer.patch' && _patchmsg="Enable Proton's gstreamer additions" && nonuser_patcher
 	  fi
 	  # Legacy wine.gaming.input patchset (Death Stranding)
 	  if git merge-base --is-ancestor 1ec8bf9b739f1528b742169670eac2350b33a7d4 HEAD; then
