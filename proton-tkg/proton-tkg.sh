@@ -103,11 +103,11 @@ function build_vrclient {
   export CFLAGS="-O2 -g"
   export CXXFLAGS="-Wno-attributes -std=c++0x -O2 -g"
   PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
-  if [ "$_standard_dlopen" = "true" ] && [ "$_proton_branch" != "proton_5.13" ]; then
+  if [ "$_standard_dlopen" = "true" ] && [[ "$_proton_branch" != *5.13 ]]; then
     patch -Np1 < "$_nowhere/proton_template/vrclient-remove-library.h-dep.patch" || true
     patch -Np1 < "$_nowhere/proton_template/vrclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch" || true
     WINEMAKERFLAGS+=" -ldl"
-  elif [ "$_proton_branch" = "proton_5.13" ]; then
+  elif [[ "$_proton_branch" = *5.13 ]]; then
     patch -Np1 < "$_nowhere/proton_template/vrclient-remove-library.h-dep.patch" || true
     WINEMAKERFLAGS+=" -ldl"
   fi
@@ -146,13 +146,13 @@ function build_lsteamclient {
   export CFLAGS="-O2 -g"
   export CXXFLAGS="-fpermissive -Wno-attributes -O2 -g"
   export PATH="$_nowhere"/proton_dist_tmp/bin:$PATH
-  if [[ "$_proton_branch" != proton_3.* ]] && [[ "$_proton_branch" != proton_4.* ]]; then
+  if [[ "$_proton_branch" != *3.* ]] && [[ "$_proton_branch" != *4.* ]]; then
     _cxx_addon="-std=gnu++11"
-    if [ "$_proton_branch" = "proton_5.0" ] && [ "$_standard_dlopen" = "true" ]; then
+    if [[ "$_proton_branch" = *5.0 ]] && [ "$_standard_dlopen" = "true" ]; then
       patch -Np1 < "$_nowhere/proton_template/steamclient-remove-library.h-dep.patch" || true
       patch -Np1 < "$_nowhere/proton_template/steamclient-use_standard_dlopen_instead_of_the_libwine_wrappers.patch" || true
       WINEMAKERFLAGS+=" -ldl"
-    elif [ "$_proton_branch" = "proton_5.13" ]; then
+    elif [[ "$_proton_branch" = *5.13 ]]; then
       patch -Np1 < "$_nowhere/proton_template/steamclient-remove-library.h-dep.patch" || true
       WINEMAKERFLAGS+=" -ldl"
     else
@@ -248,7 +248,13 @@ mkdir -p "$_nowhere/gst/lib64/gstreamer-1.0"
     rm -rf "$_nowhere"/Proton/build/mediaconv64/*
 
     #( PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib32/pkgconfig cargo build --target i686-unknown-linux-gnu --target-dir "$_nowhere"/Proton/build/mediaconv32 --release )
-    ( cargo build --target x86_64-unknown-linux-gnu --target-dir "$_nowhere"/Proton/build/mediaconv64 --release )
+
+    ( if [ ! -d '/usr/lib32' ]; then # Fedora
+      PKG_CONFIG_PATH='/usr/lib64/pkgconfig'
+    elif [ -d '/usr/lib32' ] && [ -d '/usr/lib' ] && [ -e '/usr/lib64' ]; then # Arch
+      PKG_CONFIG_PATH='/usr/lib/pkgconfig'
+    fi
+    cargo build --target x86_64-unknown-linux-gnu --target-dir "$_nowhere"/Proton/build/mediaconv64 --release )
 
     #cp -a "$_nowhere"/Proton/build/mediaconv32/i686-unknown-linux-gnu/release/libprotonmediaconverter.so "$_nowhere"/gst/lib/gstreamer-1.0/
     cp -a "$_nowhere"/Proton/build/mediaconv64/x86_64-unknown-linux-gnu/release/libprotonmediaconverter.so "$_nowhere"/gst/lib64/gstreamer-1.0/
@@ -259,20 +265,20 @@ mkdir -p "$_nowhere/gst/lib64/gstreamer-1.0"
 
 function build_steamhelper {
   # disable openvr support for now since we don't support it
-  if [ "$_proton_branch" = "proton_6.3" ]; then
+  if [[ "$_proton_branch" = *6.3 ]]; then
     ( cd Proton && patch -Np1 -R < "$_nowhere/proton_template/steamhelper_revert_openvr-support.patch" || true )
   fi
 
-  if [[ $_proton_branch != proton_3.* ]]; then
+  if [[ $_proton_branch != *3.* ]]; then
     source "$_nowhere/proton_tkg_token"
     rm -rf Proton/build/steam.win32
     mkdir -p Proton/build/steam.win32
     cp -a Proton/steam_helper/* Proton/build/steam.win32
     cd Proton/build/steam.win32
 
-    if [ "$_proton_branch" = "proton_4.11" ]; then
+    if [[ "$_proton_branch" = *4.11 ]]; then
       export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/wine/msvcrt/ -I$_nowhere/proton_dist_tmp/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
-    elif [ "$_proton_branch" = "proton_4.2" ] || [ "$_proton_branch" = "proton_5.0" ] || [ "$_proton_branch" = "proton_5.13" ]; then
+    elif [[ "$_proton_branch" = *4.2 ]] || [[ "$_proton_branch" = *5.0 ]] || [[ "$_proton_branch" = *5.13 ]]; then
       export WINEMAKERFLAGS="--nosource-fix --nolower-include --nodlls --nomsvcrt --wine32 -I$_nowhere/proton_dist_tmp/include/wine/windows/ -I$_nowhere/proton_dist_tmp/include/ -L$_nowhere/proton_dist_tmp/lib/ -L$_nowhere/proton_dist_tmp/lib/wine/"
     else
       if [ "$_new_lib_paths" = "true" ]; then
@@ -517,7 +523,9 @@ else
   fi
 
   # Build GST/mediaconverter
-  build_mediaconverter
+  if [ "$_build_mediaconv" = "true" ]; then
+    build_mediaconverter
+  fi
 
   # If mingw-w64 gcc can't be found, disable building vkd3d-proton
   if ! command -v x86_64-w64-mingw32-gcc &> /dev/null; then
@@ -609,7 +617,9 @@ else
     build_steamhelper
 
     # gst/mediaconverter
-    mv "$_nowhere"/gst/lib64/* proton_dist_tmp/lib64/
+    if [ "$_build_mediaconv" = "true" ]; then
+      mv "$_nowhere"/gst/lib64/* proton_dist_tmp/lib64/
+    fi
     rm -rf "$_nowhere/gst"
 
     # vkd3d
@@ -722,7 +732,7 @@ else
     sed -i -e "s|CURRENT_PREFIX_VERSION=\"TKG\"|${_prefix_version}|" "proton_tkg_$_protontkg_version/proton"
 
     # Patch our proton script to make use of the steam helper on 4.0+
-    if [[ $_proton_branch != proton_3.* ]] && [ "$_proton_use_steamhelper" = "true" ]; then
+    if [[ $_proton_branch != *3.* ]] && [ "$_proton_use_steamhelper" = "true" ]; then
       cd "$_nowhere/proton_tkg_$_protontkg_version"
       _patchname="steam.exe.patch"
       echo -e "\nApplying $_patchname"
@@ -850,7 +860,7 @@ else
     echo -e "Full version: $_protontkg_version\nStripped version: ${_alt_start_vercheck//./}" >> "$_logdir"/proton-tkg.log
 
     # pefixup
-    if [[ $_proton_branch != proton_3* ]] && [[ $_proton_branch != proton_4* ]] && [[ $_proton_branch != proton_5* ]] && [ ${_alt_start_vercheck//./} -ge 66 ]; then
+    if [[ $_proton_branch != *3* ]] && [[ $_proton_branch != *4* ]] && [[ $_proton_branch != *5* ]] && [ ${_alt_start_vercheck//./} -ge 66 ]; then
       echo ''
       echo "Fixing PE files..."
       find "$_nowhere"/"proton_tkg_$_protontkg_version"/ -type f -name "*.dll" -printf "%p\0" | xargs --verbose -0 -r -P8 -n3 "$_nowhere/proton_template/pefixup.py" >>"$_logdir"/proton-tkg.log 2>&1

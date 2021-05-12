@@ -58,6 +58,7 @@ _exit_cleanup() {
       echo "_dxvk_minimald3d10='true'" >> "$_proton_tkg_path"/proton_tkg_token
     fi
     echo "_new_lib_paths='${_new_lib_paths}'" >> "$_proton_tkg_path"/proton_tkg_token
+    echo "_build_mediaconv='${_build_mediaconv}'" >> "$_proton_tkg_path"/proton_tkg_token
   fi
 
   rm -f "$_where"/BIG_UGLY_FROGMINER && msg2 'Removed BIG_UGLY_FROGMINER - Ribbit' # state tracker end
@@ -1019,8 +1020,10 @@ _prepare() {
 	  if [ "$_use_staging" != "true" ]; then
 	    _use_esync="false"
 	    _use_fsync="false"
-	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 3386560057c0d30461af0973fd9dac9871387143 HEAD ); then
+	    if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor f3d41cc7897635311cf868759f95b4bf5253703b HEAD ); then
 	      _patchname='fastsync-mainline.patch' && _patchmsg="Using fastsync patchset" && nonuser_patcher
+	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 3386560057c0d30461af0973fd9dac9871387143 HEAD ); then
+	      _patchname='fastsync-mainline-f3d41cc.patch' && _patchmsg="Using fastsync patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 5df0f5f6fb90e1326b71cd1094a7b710b94916d4 HEAD ); then
 	      _patchname='fastsync-mainline-3386560.patch' && _patchmsg="Using fastsync patchset" && nonuser_patcher
 	    elif ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 340cc46287d7861ce6cae19401752e65f4089ae9 HEAD ); then
@@ -1551,10 +1554,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if git merge-base --is-ancestor 6d04e6c3a9c4c8b1cc2d1ba337c33cc56d1a8ab2 HEAD; then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7f18df46333b5686f2e3622ebc474530e15c6888 HEAD ); then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor 62cb6ace2cfe46358e6526868145a5bd8a7f990b HEAD; then
+	      if git merge-base --is-ancestor 6d04e6c3a9c4c8b1cc2d1ba337c33cc56d1a8ab2 HEAD; then
+	        _lastcommit="7f18df4"
+	      elif git merge-base --is-ancestor 62cb6ace2cfe46358e6526868145a5bd8a7f990b HEAD; then
 	        _lastcommit="6d04e6c"
 	      elif git merge-base --is-ancestor a27d5bae114eef5352b699ee38975bc8793b4dcb HEAD; then
 	        _lastcommit="62cb6ac"
@@ -1835,7 +1840,7 @@ EOM
 	echo -e "" >> "$_where"/last_build_config.log
 
 	if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
-	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 9ca95e32651d6a50dc787af4dc53fb907f1c4e2b HEAD ); then
+	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 8c0ced87bcec8bdc505bf844cc9247106ebd8c36 HEAD ); then
 	    if [ "$_use_staging" = "true" ]; then
 	      if ! git merge-base --is-ancestor dedd5ccc88547529ffb1101045602aed59fa0170 HEAD; then
 	        _patchname='proton-tkg-staging-rpc.patch' && _patchmsg="Using Steam-specific Proton-tkg patches (staging) 1/3" && nonuser_patcher
@@ -1914,7 +1919,7 @@ EOM
 	    fi
 	  else
 	    if git merge-base --is-ancestor ec9f3119306e34f5a8bd3bfeb233eed740c1c6ae HEAD; then
-	      _lastcommit="9ca95e3"
+	      _lastcommit="8c0ced8"
 	      _rpc="1"
 	      _stmbits="1"
 	    elif git merge-base --is-ancestor 5d82baf9747b7b133cad3be77c0cc9e24cc09582 HEAD; then
