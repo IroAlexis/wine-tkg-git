@@ -76,6 +76,7 @@ _exit_cleanup() {
   fi
 
   # Remove temporarily copied patches & other potential fluff
+  rm -f "$_where"/wine-mono*
   rm -f "$_where"/wine-tkg
   rm -f "$_where"/wine-tkg-interactive
   rm -f "$_where"/wine-tkg.install
@@ -241,6 +242,8 @@ msg2 ''
     if [ "$_ispkgbuild" = "true" ]; then
       _steamvr_support="false"
     fi
+    msg2 "Downloading latest mono..."
+    ( curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.msi" | cut -d : -f 2,3 | tr -d \" | wget -qi - )
   elif [ "$_EXTERNAL_INSTALL" = "proton" ]; then
     error "It looks like you're attempting to build a Proton version of wine-tkg-git."
     error "This special option doesn't use pacman and requires you to run 'proton-tkg.sh' script from proton-tkg dir."
@@ -774,11 +777,14 @@ _prepare() {
 	fi
 
 	# Disable winex11-WM_WINDOWPOSCHANGING and winex11-_NET_ACTIVE_WINDOW patchsets on proton-tkg staging
-	if ( cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
+	#if ( cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	  if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_use_staging" = "true" ] || [ "$_proton_fs_hack" = "true" ]; then
 	    _staging_args+=(-W winex11-WM_WINDOWPOSCHANGING -W winex11-_NET_ACTIVE_WINDOW)
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 76f8eb15f17ff9ae52f6c2b61824978762d421ef HEAD); then
+	      _staging_args+=(-W imm32-com-initialization)
+	    fi
 	  fi
-	fi
+	#fi
 
 	# Disable winex11.drv-mouse-coorrds and winex11-MWM_Decorations patchsets on staging for proton FS hack
 	if [ "$_proton_fs_hack" = "true" ] && [ "$_use_staging" = "true" ] && ! git merge-base --is-ancestor 0f972e2247932f255f131792724e4796b4b2b87a HEAD; then
@@ -1840,6 +1846,16 @@ EOM
 	fi
 
 	echo -e "" >> "$_where"/last_build_config.log
+
+	# Set mono version and hash for proton
+	if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_unfrog" != "true" ]; then
+	  mono_ver=$( ls "$_where"/wine-mono* | sed -e "s|.*wine-mono-||; s/-x86.msi//" )
+	  mono_sum=$( echo $( sha256sum "$_where"/wine-mono* | cut -d " " -f 1 ) )
+	  echo -e "Setting wine-mono version to ${mono_ver} with sha256 ${mono_sum}" >> "$_where"/last_build_config.log
+	  sed -i "s|#define MONO_VERSION.*|#define MONO_VERSION \"${mono_ver}\"|g" "${srcdir}"/"${_winesrcdir}"/dlls/appwiz.cpl/addons.c
+	  sed -i "s|#define MONO_SHA.*|#define MONO_SHA \"${mono_sum}\"|g" "${srcdir}"/"${_winesrcdir}"/dlls/appwiz.cpl/addons.c
+	  sed -i "s|#define WINE_MONO_VERSION.*|#define WINE_MONO_VERSION \"${mono_ver}\"|g" "${srcdir}"/"${_winesrcdir}"/dlls/mscoree/mscoree_private.h
+	fi
 
 	if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_unfrog" != "true" ] && ! git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD || ([ "$_protonify" = "true" ] && git merge-base --is-ancestor 74dc0c5df9c3094352caedda8ebe14ed2dfd615e HEAD); then
 	  if ( cd "${srcdir}"/"${_winesrcdir}" && git merge-base --is-ancestor 8c0ced87bcec8bdc505bf844cc9247106ebd8c36 HEAD ); then

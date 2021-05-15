@@ -467,6 +467,10 @@ function latest_mono {
   curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.tar.xz" | cut -d : -f 2,3 | tr -d \"
 }
 
+function latest_mono_msi {
+  curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.msi" | cut -d : -f 2,3 | tr -d \"
+}
+
 if [ "$1" = "clean" ]; then
   proton_tkg_uninstaller
 elif [ "$1" = "build_vrclient" ]; then
@@ -704,9 +708,14 @@ else
     if [ ! -e ${_mono_bin##*/} ]; then
       latest_mono | wget -qi -
     fi
+    #_mono_msi=$( latest_mono_msi )
+    #if [ ! -e ${_mono_msi##*/} ]; then
+    #  latest_mono_msi | wget -qi -
+    #fi
     cd "$_nowhere"
     mkdir -p proton_dist_tmp/share/wine/mono
     tar -xvJf "$_nowhere"/mono/wine-mono-*.tar.xz -C proton_dist_tmp/share/wine/mono >/dev/null 2>&1
+    #mv "$_nowhere"/mono/wine-mono-*.msi proton_dist_tmp/share/wine/mono
 
     # gecko
     _gecko_ver="2.47.2"
@@ -732,11 +741,11 @@ else
     echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
 
     # steampipe fixups
-    #cp "$_nowhere"/proton_template/steampipe_fixups.py "$_nowhere"/"proton_tkg_$_protontkg_version"/
+    cp "$_nowhere"/proton_template/steampipe_fixups.py "$_nowhere"/"proton_tkg_$_protontkg_version"/
 
-    # Patch our proton script to use the current proton tree prefix version value
-    _prefix_version=$(cat "$_nowhere/Proton/proton" | grep "CURRENT_PREFIX_VERSION=")
-    sed -i -e "s|CURRENT_PREFIX_VERSION=\"TKG\"|${_prefix_version}|" "proton_tkg_$_protontkg_version/proton"
+    # Inject current wine tree prefix version value in a proton-friendly format - major.minor-commitnumber
+    _prefix_version=$( echo ${_protontkg_true_version} | sed 's/.[^.]*//4g; s/.r/-/' )
+    sed -i -e "s|CURRENT_PREFIX_VERSION=\"TKG\"|CURRENT_PREFIX_VERSION=\"$_prefix_version\"|" "proton_tkg_$_protontkg_version/proton"
 
     # Patch our proton script to make use of the steam helper on 4.0+
     if [[ $_proton_branch != *3.* ]] && [ "$_proton_use_steamhelper" = "true" ]; then
@@ -856,13 +865,20 @@ else
       sed -i 's/.*PROTON_USE_WINED3D9.*/     "PROTON_USE_WINED3D9": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py"
     fi
 
-    # Disable alt start by default on 6.6 and lower
-    if [ -n $_protontkg_true_version ]; then
-      _alt_start_vercheck=$( echo "$_protontkg_true_version" | cut -f1,2 -d'.' )
-    else
-      _alt_start_vercheck=$( echo "$_protontkg_version" | cut -f1,2 -d'.' )
+    # Disable alt start if steamhelper is enabled
+    #if [ -n $_protontkg_true_version ]; then
+    #  _alt_start_vercheck=$( echo "$_protontkg_true_version" | cut -f1,2 -d'.' )
+    #else
+    #  _alt_start_vercheck=$( echo "$_protontkg_version" | cut -f1,2 -d'.' )
+    #fi
+    #( [ ${_alt_start_vercheck//./} -le 66 ] || [ "$_proton_use_steamhelper" != "true" ] ) && sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
+    if [ "$_proton_use_steamhelper" = "true" ]; then
+      if [ -n $_protontkg_true_version ]; then
+        sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_true_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
+      else
+        sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
+      fi
     fi
-    ( [ ${_alt_start_vercheck//./} -le 66 ] || [ "$_proton_use_steamhelper" != "true" ] ) && sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
 
     echo -e "Full version: $_protontkg_version\nStripped version: ${_alt_start_vercheck//./}" >> "$_logdir"/proton-tkg.log
 
@@ -874,7 +890,7 @@ else
     fi
 
     # steampipe fixups
-    #python3 "$_nowhere"/proton_template/steampipe_fixups.py process "$_nowhere"/"proton_tkg_$_protontkg_version"
+    python3 "$_nowhere"/proton_template/steampipe_fixups.py process "$_nowhere"/"proton_tkg_$_protontkg_version"
 
     cd "$_nowhere"
 

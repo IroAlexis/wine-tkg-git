@@ -172,6 +172,28 @@ class Proton:
                 if os.path.exists(old_dist_dir):
                     shutil.rmtree(old_dist_dir)
 
+    def do_steampipe_fixups(self):
+        fixups_json = self.path("steampipe_fixups.json")
+        fixups_mtime = self.path("files/steampipe_fixups_mtime")
+
+        if os.path.exists(fixups_json):
+            with self.dist_lock:
+                import steampipe_fixups
+
+                current_fixup_mtime = None
+                if os.path.exists(fixups_mtime):
+                    with open(fixups_mtime, "r") as f:
+                        current_fixup_mtime = f.readline().strip()
+
+                new_fixup_mtime = getmtimestr(fixups_json)
+
+                if current_fixup_mtime != new_fixup_mtime:
+                    result_code = steampipe_fixups.do_restore(self.base_dir, fixups_json)
+
+                    if result_code == 0:
+                        with open(fixups_mtime, "w") as f:
+                            f.write(new_fixup_mtime + "\n")
+
     def missing_default_prefix(self):
         '''Check if the default prefix dir is missing. Returns true if missing, false if present'''
         return not os.path.isdir(self.default_pfx_dir)
@@ -405,6 +427,12 @@ class CompatData:
             if not os.path.exists(self.prefix_dir + "/user.reg"):
                 self.copy_pfx()
 
+            if not os.path.lexists(self.prefix_dir + "/dosdevices/c:"):
+                os.symlink("../drive_c", self.prefix_dir + "/dosdevices/c:")
+
+            if not os.path.lexists(self.prefix_dir + "/dosdevices/z:"):
+                os.symlink("/", self.prefix_dir + "/dosdevices/z:")
+
             # collect configuration info
             if "STEAM_COMPAT_CLIENT_INSTALL_PATH" in os.environ:
                 #modern steam client sets this
@@ -426,6 +454,28 @@ class CompatData:
                     "xapofx*.dll," +
                     "xaudio*.dll," +
                     "xinput*.dll," +
+                    "devenum.dll," +
+
+                    #directshow
+                    "amstream.dll," +
+                    "qasf.dll," +
+                    "qcap.dll," +
+                    "qdvd.dll," +
+                    "qedit.dll," +
+                    "quartz.dll," +
+
+                    #directmusic
+                    "dmband.dll," +
+                    "dmcompos.dll," +
+                    "dmime.dll," +
+                    "dmloader.dll," +
+                    "dmscript.dll," +
+                    "dmstyle.dll," +
+                    "dmsynth.dll," +
+                    "dmusic.dll," +
+                    "dmusic32.dll," +
+                    "dsound.dll," +
+                    "dswave.dll," +
 
                     #vcruntime redist
                     "atl1*.dll," +
@@ -436,12 +486,142 @@ class CompatData:
                     "vcomp1*.dll," +
                     "vccorlib1*.dll," +
                     "vcruntime1*.dll," +
+                    "api-ms-win-crt-conio-l1-1-0.dll," +
+                    "api-ms-win-crt-heap-l1-1-0.dll," +
+                    "api-ms-win-crt-locale-l1-1-0.dll," +
+                    "api-ms-win-crt-math-l1-1-0.dll," +
+                    "api-ms-win-crt-runtime-l1-1-0.dll," +
+                    "api-ms-win-crt-stdio-l1-1-0.dll," +
+                    "ucrtbase.dll," +
 
                     #some games balk at ntdll symlink(?)
                     "ntdll.dll," +
 
                     #some games require official vulkan loader
-                    "vulkan-1.dll"
+                    "vulkan-1.dll," +
+
+                    #wmp9
+                    "dispex.dll," +
+                    "jscript.dll," +
+                    "scrobj.dll," +
+                    "scrrun.dll," +
+                    "vbscript.dll," +
+                    "cscript.exe," +
+                    "wscript.exe," +
+                    "wshom.ocx," +
+                    "9SeriesDefault.wmz," +
+                    "9SeriesDefault_.wmz," +
+                    "9xmigrat.dll," +
+                    "advpack.dll," +
+                    "asferror.dll," +
+                    "blackbox.dll," +
+                    "CEWMDM.dll," +
+                    "Compact.wmz," +
+                    "control.xml," +
+                    "custsat.dll," +
+                    "drm.cat," +
+                    "drm.inf," +
+                    "DRMClien.dll," +
+                    "DrmStor.dll," +
+                    "drmv2clt.dll," +
+                    "dw15.exe," +
+                    "dwintl.dll," +
+                    "engsetup.exe," +
+                    "eula.txt," +
+                    "fhg.inf," +
+                    "iexpress.inf," +
+                    "l3codeca.acm," +
+                    "LAPRXY.DLL," +
+                    "logagent.exe," +
+                    "migrate.dll," +
+                    "migrate.exe," +
+                    "MP43DMOD.DLL," +
+                    "MP4SDMOD.DLL," +
+                    "MPG4DMOD.DLL," +
+                    "mpvis.DLL," +
+                    "msdmo.dll," +
+                    "msnetobj.dll," +
+                    "msoobci.dll," +
+                    "MsPMSNSv.dll," +
+                    "MsPMSP.dll," +
+                    "MSSCP.dll," +
+                    "MSWMDM.dll," +
+                    "mymusic.inf," +
+                    "npdrmv2.dll," +
+                    "npdrmv2.zip," +
+                    "NPWMSDrm.dll," +
+                    "PidGen.dll," +
+                    "Plylst1.wpl," +
+                    "Plylst10.wpl," +
+                    "Plylst11.wpl," +
+                    "Plylst12.wpl," +
+                    "Plylst13.wpl," +
+                    "Plylst14.wpl," +
+                    "Plylst15.wpl," +
+                    "Plylst2.wpl," +
+                    "Plylst3.wpl," +
+                    "Plylst4.wpl," +
+                    "Plylst5.wpl," +
+                    "Plylst6.wpl," +
+                    "Plylst7.wpl," +
+                    "Plylst8.wpl," +
+                    "Plylst9.wpl," +
+                    "plyr_err.chm," +
+                    "qasf.dll," +
+                    "QuickSilver.wmz," +
+                    "Revert.wmz," +
+                    "roxio.inf," +
+                    "rsl.dll," +
+                    "setup_wm.cat," +
+                    "setup_wm.exe," +
+                    "setup_wm.inf," +
+                    "skins.inf," +
+                    "skinsmui.inf," +
+                    "unicows.dll," +
+                    "unregmp2.exe," +
+                    "w95inf16.dll," +
+                    "w95inf32.dll," +
+                    "wm1033.lng," +
+                    "WMADMOD.DLL," +
+                    "WMADMOE.DLL," +
+                    "WMASF.DLL," +
+                    "wmburn.exe," +
+                    "wmburn.rxc," +
+                    "wmdm.cat," +
+                    "wmdm.inf," +
+                    "WMDMLOG.dll," +
+                    "WMDMPS.dll," +
+                    "wmerror.dll," +
+                    "wmexpack.cat," +
+                    "wmexpack.inf," +
+                    "WMFSDK.cat," +
+                    "WMFSDK.inf," +
+                    "wmidx.dll," +
+                    "WMNetMgr.dll," +
+                    "wmp.cat," +
+                    "wmp.dll," +
+                    "wmp.inf," +
+                    "wmp.ocx," +
+                    "wmpasf.dll," +
+                    "wmpband.dll," +
+                    "wmpcd.dll," +
+                    "wmpcore.dll," +
+                    "wmpdxm.dll," +
+                    "wmplayer.adm," +
+                    "wmplayer.chm," +
+                    "wmplayer.exe," +
+                    "wmploc.DLL," +
+                    "WMPNS.dll," +
+                    "wmpns.jar," +
+                    "wmpshell.dll," +
+                    "wmpui.dll," +
+                    "WMSDMOD.DLL," +
+                    "WMSDMOE2.DLL," +
+                    "WMSPDMOD.DLL," +
+                    "WMSPDMOE.DLL," +
+                    "WMVCORE.DLL," +
+                    "WMVDMOD.DLL," +
+                    "WMVDMOE2.DLL"
                     )
 
             # If any of this info changes, we must rerun the tasks below
@@ -978,10 +1158,22 @@ class Session:
                 comfile = open(comfile_path, "w")
                 comfile.write("Command: " + str(sys.argv[2:]) + "\n")
                 comfile.close()
-        if "alternativestart" in self.compat_config:
-            commandtorun=[g_proton.wine_bin, "start.exe", "/b"] + sys.argv[2:] + self.cmdlineappend
+
+        commandstring = str(sys.argv[2:] + self.cmdlineappend)
+
+        # use a string check instead of single string in case we need to check for more in the future
+        check_args = [
+            'iscriptevaluator.exe' in commandstring,
+            'link2ea' in commandstring,
+            'getcompatpath' in str(sys.argv[1]),
+            'getnativepath' in str(sys.argv[1]),
+        ]
+
+        if any(check_args) and not "alternativestart" in self.compat_config:
+            commandtorun=[g_proton.wine_bin] + sys.argv[2:] + self.cmdlineappend
         else:
             commandtorun=[g_proton.wine_bin] + sys.argv[2:] + self.cmdlineappend
+
         if "winetricks" in self.compat_config:
             if os.path.exists(os.environ["STEAM_COMPAT_DATA_PATH"]):
                 tricksfile_path = os.environ["STEAM_COMPAT_DATA_PATH"] + "/tricks"
@@ -1002,8 +1194,8 @@ class Session:
                                     root.destroy()
                                     open(tricksfile_path, "w+").close()
                     except ImportError:
-                        if "alternativestart" in self.compat_config:
-                            commandtorun=[g_proton.wine_bin, "start.exe", "/b"] + sys.argv[2:] + self.cmdlineappend
+                        if any(check_args) and not "alternativestart" in self.compat_config:
+                            commandtorun=[g_proton.wine_bin] + sys.argv[2:] + self.cmdlineappend
                         else:
                             commandtorun=[g_proton.wine_bin] + sys.argv[2:] + self.cmdlineappend
         self.run_proc(commandtorun)
@@ -1017,6 +1209,7 @@ if __name__ == "__main__":
     g_proton = Proton(os.path.dirname(sys.argv[0]))
 
     g_proton.cleanup_legacy_dist()
+    g_proton.do_steampipe_fixups()
 
     g_compatdata = CompatData(os.environ["STEAM_COMPAT_DATA_PATH"])
 
@@ -1035,6 +1228,8 @@ if __name__ == "__main__":
         g_session.run()
     elif sys.argv[1] == "waitforexitandrun":
         #wait for wineserver to shut down
+        proc = subprocess.Popen(["pkill", "-f", "start.exe"], stdout=subprocess.PIPE)
+        proc.wait()
         g_session.run_proc([g_proton.wineserver_bin, "-w"])
         #then run
         g_session.run()
