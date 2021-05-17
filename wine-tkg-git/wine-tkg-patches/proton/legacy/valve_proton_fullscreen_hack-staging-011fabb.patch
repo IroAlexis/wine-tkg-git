@@ -748,9 +748,9 @@ index 6c27c6f9894..659a813cefa 100644
 +        return res;
 +    }
 +
-+    real_images = malloc(count * sizeof(VkImage));
-+    swapchain->cmd_pools = calloc(1, sizeof(VkCommandPool) * device->queue_count);
-+    swapchain->fs_hack_images = calloc(1, sizeof(struct fs_hack_image) * count);
++    real_images = heap_alloc(count * sizeof(VkImage));
++    swapchain->cmd_pools = heap_alloc_zero(sizeof(VkCommandPool) * device->queue_count);
++    swapchain->fs_hack_images = heap_alloc_zero(sizeof(struct fs_hack_image) * count);
 +    if(!real_images || !swapchain->cmd_pools || !swapchain->fs_hack_images)
 +        goto fail;
 +
@@ -869,16 +869,16 @@ index 6c27c6f9894..659a813cefa 100644
 +        }
 +    }
 +
-+    free(real_images);
++    heap_free(real_images);
 +
 +    return VK_SUCCESS;
 +
 +fail:
 +    for(i = 0; i < swapchain->n_images; ++i)
 +        destroy_fs_hack_image(device, swapchain, &swapchain->fs_hack_images[i]);
-+    free(real_images);
-+    free(swapchain->cmd_pools);
-+    free(swapchain->fs_hack_images);
++    heap_free(real_images);
++    heap_free(swapchain->cmd_pools);
++    heap_free(swapchain->fs_hack_images);
 +    return res;
 +}
 +
@@ -926,7 +926,7 @@ index 6c27c6f9894..659a813cefa 100644
  
 -    native_info = *create_info;
 -    native_info.surface = wine_surface_from_handle(create_info->surface)->driver_surface;
-+    if (!(object = calloc(1, sizeof(*object))))
++    if (!(object = heap_alloc_zero(sizeof(*object))))
 +    {
 +        ERR("Failed to allocate memory for swapchain\n");
 +        return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -947,7 +947,7 @@ index 6c27c6f9894..659a813cefa 100644
 +
 +        device->phys_dev->instance->funcs.p_vkGetPhysicalDeviceQueueFamilyProperties(device->phys_dev->phys_dev, &count, NULL);
 +
-+        device->queue_props = malloc(sizeof(VkQueueFamilyProperties) * count);
++        device->queue_props = heap_alloc(sizeof(VkQueueFamilyProperties) * count);
 +
 +        device->phys_dev->instance->funcs.p_vkGetPhysicalDeviceQueueFamilyProperties(device->phys_dev->phys_dev, &count, device->queue_props);
 +
@@ -955,7 +955,7 @@ index 6c27c6f9894..659a813cefa 100644
 +        if(result != VK_SUCCESS)
 +        {
 +            TRACE("vkGetPhysicalDeviceSurfaceCapabilities failed, res=%d\n", result);
-+            free(object);
++            heap_free(object);
 +            return result;
 +        }
 +
@@ -977,7 +977,7 @@ index 6c27c6f9894..659a813cefa 100644
 +    if(result != VK_SUCCESS)
 +    {
 +        TRACE("vkCreateSwapchainKHR failed, res=%d\n", result);
-+        free(object);
++        heap_free(object);
 +        return result;
 +    }
  
@@ -992,7 +992,7 @@ index 6c27c6f9894..659a813cefa 100644
 +            ERR("creating fs hack images failed: %d\n", result);
 +            device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
 +            WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, object);
-+            free(object);
++            heap_free(object);
 +            return result;
 +        }
 +
@@ -1107,14 +1107,14 @@ index 6c27c6f9894..659a813cefa 100644
 +        device->funcs.p_vkDestroySampler(device->device, object->sampler, NULL);
 +        device->funcs.p_vkFreeMemory(device->device, object->user_image_memory, NULL);
 +        device->funcs.p_vkFreeMemory(device->device, object->blit_image_memory, NULL);
-+        free(object->cmd_pools);
-+        free(object->fs_hack_images);
++        heap_free(object->cmd_pools);
++        heap_free(object->fs_hack_images);
 +    }
 +
 +    device->funcs.p_vkDestroySwapchainKHR(device->device, object->swapchain, NULL);
 +
 +    WINE_VK_REMOVE_HANDLE_MAPPING(device->phys_dev->instance, object);
-+    free(object);
++    heap_free(object);
 +}
 +
 +VkResult WINAPI wine_vkGetSwapchainImagesKHR(VkDevice device, VkSwapchainKHR swapchain, uint32_t *pSwapchainImageCount, VkImage *pSwapchainImages)
@@ -1583,7 +1583,7 @@ index 6c27c6f9894..659a813cefa 100644
 +
 +            if(!blit_cmds){
 +                queue_idx = queue->family_index;
-+                blit_cmds = malloc(our_presentInfo.swapchainCount * sizeof(VkCommandBuffer));
++                blit_cmds = heap_alloc(our_presentInfo.swapchainCount * sizeof(VkCommandBuffer));
 +                blit_sema = hack->blit_finished;
 +            }
 +
@@ -1597,7 +1597,7 @@ index 6c27c6f9894..659a813cefa 100644
 +                hack->cmd = create_hack_cmd(queue, swapchain, queue_idx);
 +
 +                if(!hack->cmd){
-+                    free(blit_cmds);
++                    heap_free(blit_cmds);
 +                    return VK_ERROR_DEVICE_LOST;
 +                }
 +
@@ -1615,7 +1615,7 @@ index 6c27c6f9894..659a813cefa 100644
 +                            swapchain->cmd_pools[hack->cmd_queue_idx],
 +                            1, &hack->cmd);
 +                    hack->cmd = NULL;
-+                    free(blit_cmds);
++                    heap_free(blit_cmds);
 +                    return res;
 +                }
 +            }
@@ -1630,7 +1630,7 @@ index 6c27c6f9894..659a813cefa 100644
 +        VkPipelineStageFlags waitStage, *waitStages, *waitStages_arr = NULL;
 +
 +        if(pPresentInfo->waitSemaphoreCount > 1){
-+            waitStages_arr = malloc(sizeof(VkPipelineStageFlags) * pPresentInfo->waitSemaphoreCount);
++            waitStages_arr = heap_alloc(sizeof(VkPipelineStageFlags) * pPresentInfo->waitSemaphoreCount);
 +            for(i = 0; i < pPresentInfo->waitSemaphoreCount; ++i)
 +                waitStages_arr[i] = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
 +            waitStages = waitStages_arr;
@@ -1653,14 +1653,14 @@ index 6c27c6f9894..659a813cefa 100644
 +        if(res != VK_SUCCESS)
 +            ERR("vkQueueSubmit: %d\n", res);
 +
-+        free(waitStages_arr);
-+        free(blit_cmds);
++        heap_free(waitStages_arr);
++        heap_free(blit_cmds);
 +
 +        our_presentInfo.waitSemaphoreCount = 1;
 +        our_presentInfo.pWaitSemaphores = &blit_sema;
 +    }
 +
-+    arr = malloc(our_presentInfo.swapchainCount * sizeof(VkSwapchainKHR));
++    arr = heap_alloc(our_presentInfo.swapchainCount * sizeof(VkSwapchainKHR));
 +    if(!arr){
 +        ERR("Failed to allocate memory for swapchain array\n");
 +        return VK_ERROR_OUT_OF_HOST_MEMORY;
@@ -1673,7 +1673,7 @@ index 6c27c6f9894..659a813cefa 100644
 +
 +    res = queue->device->funcs.p_vkQueuePresentKHR(queue->queue, &our_presentInfo);
 +
-+    free(arr);
++    heap_free(arr);
 +
 +    return res;
 +
@@ -1683,8 +1683,8 @@ index 4a41a15461e..e0b47b32bc3 100644
 --- a/dlls/winevulkan/vulkan_private.h
 +++ b/dlls/winevulkan/vulkan_private.h
 @@ -92,6 +92,44 @@ struct VkDevice_T
-     struct VkQueue_T* queues;
-     uint32_t queue_count;
+ 
+     unsigned int quirks;
  
 +    VkQueueFamilyProperties *queue_props;
 +
@@ -1762,7 +1762,7 @@ index cc2866e7883..2970c688231 100644
 -
 -    if (!in) return NULL;
 -
--    out = malloc(count * sizeof(*out));
+-    out = heap_alloc(count * sizeof(*out));
 -    for (i = 0; i < count; i++)
 -    {
 -        out[i].sType = in[i].sType;
@@ -1783,7 +1783,7 @@ index cc2866e7883..2970c688231 100644
 -{
 -    if (!in) return;
 -
--    free(in);
+-    heap_free(in);
 -}
 -
 -static inline VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count)
@@ -1793,7 +1793,7 @@ index cc2866e7883..2970c688231 100644
 -
 -    if (!in) return NULL;
 -
--    out = malloc(count * sizeof(*out));
+-    out = heap_alloc(count * sizeof(*out));
 -    for (i = 0; i < count; i++)
 -    {
 -        out[i].sType = in[i].sType;
@@ -1815,7 +1815,7 @@ index cc2866e7883..2970c688231 100644
 -{
 -    if (!in) return;
 -
--    free(in);
+-    heap_free(in);
 -}
 -
  static inline VkBufferMemoryBarrier2KHR_host *convert_VkBufferMemoryBarrier2KHR_array_win_to_host(const VkBufferMemoryBarrier2KHR *in, uint32_t count)
@@ -1875,7 +1875,7 @@ index cc2866e7883..2970c688231 100644
 -    TRACE("%p, %p, %p\n", device, pAcquireInfo, pImageIndex);
 -    return device->funcs.p_vkAcquireNextImage2KHR(device->device, pAcquireInfo, pImageIndex);
 -#endif
-+    out = malloc(count * sizeof(*out));
++    out = heap_alloc(count * sizeof(*out));
 +    for (i = 0; i < count; i++)
 +    {
 +        out[i].sType = in[i].sType;
@@ -1896,7 +1896,7 @@ index cc2866e7883..2970c688231 100644
 +{
 +    if (!in) return;
 +
-+    free(in);
++    heap_free(in);
 +}
 +
 +VkImageMemoryBarrier_host *convert_VkImageMemoryBarrier_array_win_to_host(const VkImageMemoryBarrier *in, uint32_t count)
@@ -1906,7 +1906,7 @@ index cc2866e7883..2970c688231 100644
 +
 +    if (!in) return NULL;
 +
-+    out = malloc(count * sizeof(*out));
++    out = heap_alloc(count * sizeof(*out));
 +    for (i = 0; i < count; i++)
 +    {
 +        out[i].sType = in[i].sType;
@@ -1928,7 +1928,7 @@ index cc2866e7883..2970c688231 100644
 +{
 +    if (!in) return;
 +
-+    free(in);
++    heap_free(in);
  }
  
  VkResult WINAPI wine_vkAcquireNextImageKHR(VkDevice device, VkSwapchainKHR swapchain, uint64_t timeout, VkSemaphore semaphore, VkFence fence, uint32_t *pImageIndex)
@@ -2886,7 +2886,7 @@ index 00000000000..98b26a933e7
 +    if (!real_settings_handler.get_current_mode(real_id, &real_mode))
 +        return FALSE;
 +
-+    if (!(fs_monitor = malloc(sizeof(*fs_monitor))))
++    if (!(fs_monitor = heap_alloc(sizeof(*fs_monitor))))
 +        return FALSE;
 +
 +    fs_monitor->user_mode = real_mode;
@@ -2898,7 +2898,7 @@ index 00000000000..98b26a933e7
 +    if (!fs_monitor_add_modes(fs_monitor))
 +    {
 +        ERR("Failed to initialize display modes.\n");
-+        free(fs_monitor);
++        heap_free(fs_monitor);
 +        return FALSE;
 +    }
 +    list_add_tail(&fs_monitors, &fs_monitor->entry);
@@ -3643,9 +3643,9 @@ index 2c9aff7e777..d5799690509 100644
  }
  
 @@ -1915,6 +1945,9 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
-     double dx = 0, dy = 0, val;
+     double x_accum = 0, y_accum = 0;
      struct x11drv_thread_data *thread_data = x11drv_thread_data();
-     struct x11drv_valuator_data *x_rel, *y_rel;
+     XIValuatorClassInfo *x_pos, *y_pos;
 +    POINT pt;
 +    HMONITOR monitor;
 +    double user_to_real_scale;
@@ -3653,8 +3653,8 @@ index 2c9aff7e777..d5799690509 100644
      if (thread_data->x_rel_valuator.number < 0 || thread_data->y_rel_valuator.number < 0) return FALSE;
      if (!event->valuators.mask_len) return FALSE;
 @@ -1960,6 +1993,12 @@ static BOOL X11DRV_RawMotion( XGenericEventCookie *xev )
-     input.u.mi.dx          = 0;
-     input.u.mi.dy          = 0;
+     x_pos->value = x_accum - input.u.mi.dx;
+     y_pos->value = y_accum - input.u.mi.dy;
  
 +    GetCursorPos(&pt);
 +    monitor = MonitorFromPoint(pt, MONITOR_DEFAULTTONULL);
@@ -3662,9 +3662,9 @@ index 2c9aff7e777..d5799690509 100644
 +    input.u.mi.dx = lround((double)input.u.mi.dx / user_to_real_scale);
 +    input.u.mi.dy = lround((double)input.u.mi.dy / user_to_real_scale);
 +
-     virtual_rect = get_virtual_screen_rect();
- 
-     for (i = 0; i <= max ( x_rel->number, y_rel->number ); i++)
+     if (!thread_data->xi2_rawinput_only)
+     {
+         if ((dy || dy) && !(input.u.mi.dx || input.u.mi.dy))
 diff --git a/dlls/winex11.drv/opengl.c b/dlls/winex11.drv/opengl.c
 index 4a3ab31273a..97463882355 100644
 --- a/dlls/winex11.drv/opengl.c
@@ -7244,23 +7244,22 @@ index 4d79f29876b..5563af5fa41 100644
  
      return TRUE;
  
-@@ -255,20 +257,28 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
+@@ -268,16 +270,26 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
          const VkSwapchainCreateInfoKHR *create_info,
          const VkAllocationCallbacks *allocator, VkSwapchainKHR *swapchain)
  {
 +    VkResult result;
-     struct wine_vk_surface *x11_surface = surface_from_handle(create_info->surface);
      VkSwapchainCreateInfoKHR create_info_host;
++    struct wine_vk_surface *x11_surface = surface_from_handle(create_info->surface);
++
      TRACE("%p %p %p %p\n", device, create_info, allocator, swapchain);
  
      if (allocator)
          FIXME("Support for allocation callbacks not implemented yet\n");
  
-     if (!x11_surface->hwnd)
-         return VK_ERROR_SURFACE_LOST_KHR;
- 
      create_info_host = *create_info;
-     create_info_host.surface = x11_surface->surface;
+-    create_info_host.surface = surface_from_handle(create_info->surface)->surface;
++    create_info_host.surface = x11_surface->surface;
  
 -    return pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
 +    result = pvkCreateSwapchainKHR(device, &create_info_host, NULL /* allocator */, swapchain);
@@ -7373,41 +7372,41 @@ index 5563af5fa41..7230b778cc5 100644
  
      TRACE("%p %p %p %p\n", instance, create_info, allocator, surface);
  
-@@ -304,6 +322,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
-     x11_surface->hwnd = create_info->hwnd;
-     x11_surface->window = x11_surface->hwnd ? create_client_window(create_info->hwnd, &default_visual)
-                                             : create_dummy_client_window();
+@@ -317,6 +337,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
+         return VK_ERROR_OUT_OF_HOST_MEMORY;
+ 
+     x11_surface->ref = 1;
 +    list_init(&x11_surface->entry);
  
+     x11_surface->window = create_client_window(create_info->hwnd, &default_visual);
      if (!x11_surface->window)
-     {
-@@ -329,12 +348,23 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
-     if (x11_surface->hwnd)
-     {
-         EnterCriticalSection(&context_section);
--        if (!XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&prev))
-+        if (XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&surface_list) &&
-+                (surface_list = heap_alloc_zero(sizeof(*surface_list))))
-         {
--            wine_vk_surface_release(prev);
-+            list_init(surface_list);
-+            XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)surface_list);
-         }
--        XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)wine_vk_surface_grab(x11_surface));
-+        if (!XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&surface_list))
-+            list_add_tail(surface_list, &x11_surface->entry);
-         LeaveCriticalSection(&context_section);
-+
-+        if (!surface_list)
-+        {
-+            ERR("Failed to allocate surface list %p\n", create_info->hwnd);
-+            res = VK_ERROR_OUT_OF_HOST_MEMORY;
-+            goto err;
-+        }
-+
+@@ -342,13 +363,23 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
      }
  
+     EnterCriticalSection(&context_section);
+-    if (!XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&prev))
++    if (XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&surface_list) &&
++        (surface_list = heap_alloc_zero(sizeof(*surface_list))))
+     {
+-        wine_vk_surface_release(prev);
++        list_init(surface_list);
++        XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)surface_list);
+     }
+-    XSaveContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char *)wine_vk_surface_grab(x11_surface));
++    if (!XFindContext(gdi_display, (XID)create_info->hwnd, vulkan_hwnd_context, (char **)&surface_list))
++        list_add_tail(surface_list, &x11_surface->entry);
+     LeaveCriticalSection(&context_section);
+ 
++    if (!surface_list)
++    {
++        ERR("Failed to allocate surface list %p\n", create_info->hwnd);
++        res = VK_ERROR_OUT_OF_HOST_MEMORY;
++        goto err;
++    }
++
      *surface = (uintptr_t)x11_surface;
+ 
+     TRACE("Created surface=0x%s\n", wine_dbgstr_longlong(*surface));
 diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
 index 559d9e7880a..eb508c05b5d 100644
 --- a/dlls/winex11.drv/window.c
@@ -7455,9 +7454,9 @@ index 7230b778cc5..b4d674f78e8 100644
 --- a/dlls/winex11.drv/vulkan.c
 +++ b/dlls/winex11.drv/vulkan.c
 @@ -64,6 +64,7 @@ struct wine_vk_surface
-     VkPresentModeKHR present_mode;
-     BOOL offscreen; /* drawable is offscreen */
-     HWND hwnd;
+     LONG ref;
+     Window window;
+     VkSurfaceKHR surface; /* native surface */
 +    HDC dc;
  };
  
@@ -7488,14 +7487,14 @@ index 7230b778cc5..b4d674f78e8 100644
  
      heap_free(surface);
  }
-@@ -322,6 +339,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
-     x11_surface->hwnd = create_info->hwnd;
-     x11_surface->window = x11_surface->hwnd ? create_client_window(create_info->hwnd, &default_visual)
-                                             : create_dummy_client_window();
+@@ -337,6 +347,7 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
+         return VK_ERROR_OUT_OF_HOST_MEMORY;
+ 
+     x11_surface->ref = 1;
 +    x11_surface->dc = GetDC(create_info->hwnd);
      list_init(&x11_surface->entry);
  
-     if (!x11_surface->window)
+     x11_surface->window = create_client_window(create_info->hwnd, &default_visual);
 diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
 index eb508c05b5d..337b6328944 100644
 --- a/dlls/winex11.drv/window.c
@@ -7881,9 +7880,9 @@ index 1d7f47d1dc8..ccdc1b1a1ff 100644
      Window window;
      VkSurfaceKHR surface; /* native surface */
 +    BOOL offscreen; /* drawable is offscreen */
-     HWND hwnd;
      HDC dc;
  };
+ 
 @@ -244,6 +246,31 @@ void wine_vk_surface_destroy(HWND hwnd)
      heap_free(surface_list);
  }
@@ -7960,12 +7959,12 @@ index 1d7f47d1dc8..ccdc1b1a1ff 100644
  }
  
  static VkResult X11DRV_vkAcquireNextImage2KHR(VkDevice device,
-@@ -344,13 +399,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
+@@ -352,13 +407,6 @@ static VkResult X11DRV_vkCreateWin32SurfaceKHR(VkInstance instance,
      if (allocator)
          FIXME("Support for allocation callbacks not implemented yet\n");
  
 -    /* TODO: support child window rendering. */
--    if (create_info->hwnd && GetAncestor(create_info->hwnd, GA_PARENT) != GetDesktopWindow())
+-    if (GetAncestor(create_info->hwnd, GA_PARENT) != GetDesktopWindow())
 -    {
 -        FIXME("Application requires child window rendering, which is not implemented yet!\n");
 -        return VK_ERROR_INCOMPATIBLE_DRIVER;
@@ -8075,8 +8074,8 @@ index ccdc1b1a1ff..4a976a4a661 100644
      VkSurfaceKHR surface; /* native surface */
 +    VkPresentModeKHR present_mode;
      BOOL offscreen; /* drawable is offscreen */
-     HWND hwnd;
      HDC dc;
+ };
 @@ -99,6 +100,9 @@ static VkResult (*pvkGetPhysicalDeviceSurfaceSupportKHR)(VkPhysicalDevice, uint3
  static VkBool32 (*pvkGetPhysicalDeviceXlibPresentationSupportKHR)(VkPhysicalDevice, uint32_t, Display *, VisualID);
  static VkResult (*pvkGetSwapchainImagesKHR)(VkDevice, VkSwapchainKHR, uint32_t *, VkImage *);
@@ -8144,7 +8143,7 @@ index ccdc1b1a1ff..4a976a4a661 100644
      return result;
  }
  
-@@ -375,6 +405,11 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
+@@ -383,6 +413,11 @@ static VkResult X11DRV_vkCreateSwapchainKHR(VkDevice device,
      create_info_host = *create_info;
      create_info_host.surface = x11_surface->surface;
  
@@ -8843,69 +8842,3 @@ index 9f37398cd7e..38eaf5e3cbc 100644
  };
  
  BOOL wined3d_filter_messages(HWND window, BOOL filter) DECLSPEC_HIDDEN;
-From 164d2b8b3ae2cf65693eed01bd696f791db5d5cc Mon Sep 17 00:00:00 2001
-From: Paul Gofman <pgofman@codeweavers.com>
-Date: Tue, 11 May 2021 21:02:05 +0300
-Subject: [PATCH] winex11.drv: Add GUID_DISPLAY_DEVICE_ARRIVAL interface to
- display device.
-
-CW-Bug-Id: 18931
----
- dlls/winex11.drv/display.c | 7 +++++++
- include/ntddvdeo.h         | 1 +
- 2 files changed, 8 insertions(+)
-
-diff --git a/dlls/winex11.drv/display.c b/dlls/winex11.drv/display.c
-index 0a44aca39f0..546b4c3370a 100644
---- a/dlls/winex11.drv/display.c
-+++ b/dlls/winex11.drv/display.c
-@@ -605,6 +605,13 @@ static BOOL X11DRV_InitGpu(HDEVINFO devinfo, const struct x11drv_gpu *gpu, INT g
-     if (!link_device(instanceW, &GUID_DEVINTERFACE_DISPLAY_ADAPTER))
-         goto done;
- 
-+    /* Register GUID_DISPLAY_DEVICE_ARRIVAL */
-+    if (!SetupDiCreateDeviceInterfaceW(devinfo, &device_data, &GUID_DISPLAY_DEVICE_ARRIVAL, NULL, 0, &iface_data))
-+        goto done;
-+
-+    if (!link_device(instanceW, &GUID_DISPLAY_DEVICE_ARRIVAL))
-+        goto done;
-+
-     /* Write HardwareID registry property, REG_MULTI_SZ */
-     written = sprintfW(bufferW, gpu_hardware_id_fmtW, gpu->vendor_id, gpu->device_id);
-     bufferW[written + 1] = 0;
-diff --git a/include/ntddvdeo.h b/include/ntddvdeo.h
-index 9523e37f7b4..b830f9ff6f7 100644
---- a/include/ntddvdeo.h
-+++ b/include/ntddvdeo.h
-@@ -20,6 +20,7 @@
- #define _NTDDVDEO_
- 
- DEFINE_GUID(GUID_DEVINTERFACE_DISPLAY_ADAPTER, 0x5b45201d, 0xf2f2, 0x4f3b, 0x85, 0xbb, 0x30, 0xff, 0x1f, 0x95, 0x35, 0x99);
-+DEFINE_GUID(GUID_DISPLAY_DEVICE_ARRIVAL, 0x1ca05180, 0xa699, 0x450a, 0x9a, 0x0c, 0xde, 0x4f, 0xbe, 0x3d, 0xdd, 0x89);
- DEFINE_GUID(GUID_DEVINTERFACE_MONITOR, 0xe6f07b5f, 0xee97, 0x4a90, 0xb0, 0x76, 0x33, 0xf5, 0x7b, 0xf4, 0xea, 0xa7);
- 
- #endif
-diff --git a/dlls/winex11.drv/vulkan.c b/dlls/winex11.drv/vulkan.c
-index 74df1e80843..9263919862a 100644
---- a/dlls/winex11.drv/vulkan.c
-+++ b/dlls/winex11.drv/vulkan.c
-@@ -871,6 +871,9 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz,
-             dst_blit->extent.height = scaled.cy;
-         }
- 
-+        if (filter)
-+            *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
-+
-         return VK_TRUE;
-     }
-     else if (fs_hack_enabled(monitor))
-@@ -880,9 +883,6 @@ static VkBool32 X11DRV_query_fs_hack(VkSurfaceKHR surface, VkExtent2D *real_sz,
- 
-         GetClientRect( hwnd, &client_rect );
- 
--        if (filter)
--            *filter = fs_hack_is_integer() ? VK_FILTER_NEAREST : VK_FILTER_LINEAR;
--
-         if (real_sz)
-         {
-             real_sz->width = (client_rect.right - client_rect.left) * scale;
