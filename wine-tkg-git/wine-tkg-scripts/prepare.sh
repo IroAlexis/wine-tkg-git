@@ -76,7 +76,6 @@ _exit_cleanup() {
   fi
 
   # Remove temporarily copied patches & other potential fluff
-  rm -f "$_where"/wine-mono*
   rm -f "$_where"/wine-tkg
   rm -f "$_where"/wine-tkg-interactive
   rm -f "$_where"/wine-tkg.install
@@ -242,8 +241,11 @@ msg2 ''
     if [ "$_ispkgbuild" = "true" ]; then
       _steamvr_support="false"
     fi
-    msg2 "Downloading latest mono..."
-    ( curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.msi" | cut -d : -f 2,3 | tr -d \" | wget -qi - )
+    if ! [ -f "$_where"/$( curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.msi" | cut -d : -f 2,3 | tr -d \" | sed -e "s|.*/||") ]; then
+      rm -f "$_where"/wine-mono* # Remove any existing older mono
+      msg2 "Downloading latest mono..."
+      ( curl -s https://api.github.com/repos/madewokherd/wine-mono/releases/latest | grep "browser_download_url.*x86.msi" | cut -d : -f 2,3 | tr -d \" | wget -qi - )
+    fi
   elif [ "$_EXTERNAL_INSTALL" = "proton" ]; then
     error "It looks like you're attempting to build a Proton version of wine-tkg-git."
     error "This special option doesn't use pacman and requires you to run 'proton-tkg.sh' script from proton-tkg dir."
@@ -1562,10 +1564,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7f18df46333b5686f2e3622ebc474530e15c6888 HEAD ); then
+	    if git merge-base --is-ancestor a92ab08688b1e425c887ccb77196bbf681f24be1 HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor 011fabb2c43d13402ea18b6ea7be3669b5e6c7a8 HEAD; then
+	      if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7f18df46333b5686f2e3622ebc474530e15c6888 HEAD ); then
+	        _lastcommit="a92ab08"
+	      elif git merge-base --is-ancestor 011fabb2c43d13402ea18b6ea7be3669b5e6c7a8 HEAD; then
 	        _lastcommit="7f18df4"
 	      elif git merge-base --is-ancestor 6d04e6c3a9c4c8b1cc2d1ba337c33cc56d1a8ab2 HEAD; then
 	        _lastcommit="011fabb"
