@@ -782,7 +782,7 @@ _prepare() {
 	#if ( cd "${srcdir}"/"${_winesrcdir}" && ! git merge-base --is-ancestor 0c249e6125fc9dc6ee86b4ef6ae0d9fa2fc6291b HEAD ); then
 	  if [ "$_EXTERNAL_INSTALL" = "proton" ] && [ "$_use_staging" = "true" ] || [ "$_proton_fs_hack" = "true" ]; then
 	    _staging_args+=(-W winex11-WM_WINDOWPOSCHANGING -W winex11-_NET_ACTIVE_WINDOW)
-	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 76f8eb15f17ff9ae52f6c2b61824978762d421ef HEAD); then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 76f8eb15f17ff9ae52f6c2b61824978762d421ef HEAD ); then
 	      _staging_args+=(-W imm32-com-initialization)
 	    fi
 	  fi
@@ -1564,10 +1564,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if git merge-base --is-ancestor 454712a94d62849324d20014c786b0e7c452bf61 HEAD; then
+	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor a71e4cdf85fae1282d7cab042fabd66e407d11d6 HEAD ); then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor a92ab08688b1e425c887ccb77196bbf681f24be1 HEAD; then
+	      if git merge-base --is-ancestor 454712a94d62849324d20014c786b0e7c452bf61 HEAD; then
+	        _lastcommit="a71e4cd"
+	      elif git merge-base --is-ancestor a92ab08688b1e425c887ccb77196bbf681f24be1 HEAD; then
 	        _lastcommit="454712a"
 	      elif ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor 7f18df46333b5686f2e3622ebc474530e15c6888 HEAD ); then
 	        _lastcommit="a92ab08"

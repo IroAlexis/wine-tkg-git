@@ -171,16 +171,27 @@ function build_lsteamclient {
   cd build/lsteamclient.win64
   winemaker $WINEMAKERFLAGS -DSTEAM_API_EXPORTS -L"$_nowhere/proton_dist_tmp/lib64/" -L"$_nowhere/proton_dist_tmp/lib64/wine/" .
   make -e CC="winegcc -m64" CXX="wineg++ -m64 $_cxx_addon" -C "$_nowhere/Proton/build/lsteamclient.win64" -j$(nproc) && strip lsteamclient.dll.so
+  winebuild --dll --fake-module -E "$_nowhere/Proton/build/lsteamclient.win64/lsteamclient.spec" -o lsteamclient.dll.fake
   cd ../..
 
   cd build/lsteamclient.win32
   winemaker $WINEMAKERFLAGS --wine32 -DSTEAM_API_EXPORTS -L"$_nowhere/proton_dist_tmp/lib/" -L"$_nowhere/proton_dist_tmp/lib/wine/" .
   make -e CC="winegcc -m32" CXX="wineg++ -m32 $_cxx_addon" -C "$_nowhere/Proton/build/lsteamclient.win32" -j$(nproc) && strip lsteamclient.dll.so
+  winebuild --dll --fake-module -E "$_nowhere/Proton/build/lsteamclient.win32/lsteamclient.spec" -o lsteamclient.dll.fake
   cd "$_nowhere"
 
   # Inject lsteamclient libs in our wine-tkg-git build
-  cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/
-  cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.so proton_dist_tmp/lib/wine/
+  if [ "$_new_lib_paths" = "true" ]; then
+    cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/x86_64-unix
+    cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.so proton_dist_tmp/lib/wine/i386-unix
+    cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.fake proton_dist_tmp/lib64/wine/x86_64-windows/lsteamclient.dll
+    cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.fake proton_dist_tmp/lib/wine/i386-windows/lsteamclient.dll
+  else
+    cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/
+    cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.so proton_dist_tmp/lib/wine/
+    cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.fake proton_dist_tmp/lib64/wine/fakedlls/lsteamclient.dll
+    cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.fake proton_dist_tmp/lib/wine/fakedlls/lsteamclient.dll
+  fi
 }
 
 function build_vkd3d {
@@ -270,7 +281,7 @@ function build_steamhelper {
   fi
 
   if [[ $_proton_branch != *3.* ]]; then
-    source "$_nowhere/proton_tkg_token"
+    source "$_nowhere/proton_tkg_token" || true
     rm -rf Proton/build/steam.win32
     mkdir -p Proton/build/steam.win32
     cp -a Proton/steam_helper/* Proton/build/steam.win32
@@ -290,10 +301,19 @@ function build_steamhelper {
 
     winemaker $WINEMAKERFLAGS --guiexe -lsteam_api -lole32 -I"$_nowhere/Proton/build/lsteamclient.win32/steamworks_sdk_142/" -L"$_nowhere/Proton/steam_helper" .
     make -e CC="winegcc -m32" CXX="wineg++ -m32" -C "$_nowhere/Proton/build/steam.win32" -j$(nproc) && strip steam.exe.so
+    touch "$_nowhere/Proton/build/steam.win32/steam.exe.spec"
+    winebuild --dll --fake-module -E "$_nowhere/Proton/build/steam.win32/steam.exe.spec" -o steam.exe.fake
     cd "$_nowhere"
 
-    cp -v Proton/build/steam.win32/steam.exe.so proton_dist_tmp/lib/wine/
-    cp -v Proton/build/steam.win32/libsteam_api.so proton_dist_tmp/lib/
+    if [ "$_new_lib_paths" = "true" ]; then
+      cp -v Proton/build/steam.win32/steam.exe.fake proton_dist_tmp/lib/wine/i386-windows/steam.exe
+      cp -v Proton/build/steam.win32/steam.exe.so proton_dist_tmp/lib/wine/i386-unix/
+      cp -v Proton/build/steam.win32/libsteam_api.so proton_dist_tmp/lib/
+    else
+      cp -v Proton/build/steam.win32/steam.exe.fake proton_dist_tmp/lib/wine/fakedlls/steam.exe
+      cp -v Proton/build/steam.win32/steam.exe.so proton_dist_tmp/lib/wine/
+      cp -v Proton/build/steam.win32/libsteam_api.so proton_dist_tmp/lib/
+    fi
   fi
 }
 
@@ -866,12 +886,7 @@ else
     fi
 
     # Disable alt start if steamhelper is enabled
-    #if [ -n $_protontkg_true_version ]; then
-    #  _alt_start_vercheck=$( echo "$_protontkg_true_version" | cut -f1,2 -d'.' )
-    #else
-    #  _alt_start_vercheck=$( echo "$_protontkg_version" | cut -f1,2 -d'.' )
-    #fi
-    #( [ ${_alt_start_vercheck//./} -le 66 ] || [ "$_proton_use_steamhelper" != "true" ] ) && sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
+    _alt_start_vercheck=$( echo "$_protontkg_version" | cut -f1,2 -d'.' )
     if [ "$_proton_use_steamhelper" = "true" ]; then
       sed -i 's/.*PROTON_ALT_START.*/#     "PROTON_ALT_START": "1",/g' "proton_tkg_$_protontkg_version/user_settings.py" | echo "Disable alt start" >> "$_logdir"/proton-tkg.log
     fi
@@ -879,7 +894,7 @@ else
     echo -e "Full version: $_protontkg_version\nStripped version: ${_alt_start_vercheck//./}" >> "$_logdir"/proton-tkg.log
 
     # pefixup
-    if [[ $_proton_branch != *3* ]] && [[ $_proton_branch != *4* ]] && [[ $_proton_branch != *5* ]] && [ ${_alt_start_vercheck//./} -ge 66 ]; then
+    if [[ $_proton_branch != *3.* ]] && [[ $_proton_branch != *4.* ]] && [[ $_proton_branch != *5.* ]] && [ ${_alt_start_vercheck//./} -ge 66 ]; then
       echo ''
       echo "Fixing PE files..."
       find "$_nowhere"/"proton_tkg_$_protontkg_version"/ -type f -name "*.dll" -printf "%p\0" | xargs --verbose -0 -r -P8 -n3 "$_nowhere/proton_template/pefixup.py" >>"$_logdir"/proton-tkg.log 2>&1
