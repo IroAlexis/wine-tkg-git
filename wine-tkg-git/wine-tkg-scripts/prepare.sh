@@ -5,17 +5,17 @@ _exit_cleanup() {
   if [ -e "$_where"/BIG_UGLY_FROGMINER ] && [ "$_EXTERNAL_INSTALL" = "proton" ] && [ -n "$_proton_tkg_path" ]; then
     if [ -n "$_PROTON_NAME_ADDON" ]; then
       if [ "$_ispkgbuild" = "true" ]; then
-        echo "_protontkg_version=makepkg.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
-        echo "_protontkg_true_version=${pkgver}.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_version='makepkg.${_PROTON_NAME_ADDON}'" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_true_version='${pkgver}.${_PROTON_NAME_ADDON}'" >> "$_proton_tkg_path"/proton_tkg_token
       else
-        echo "_protontkg_version=${pkgver}.${_PROTON_NAME_ADDON}" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_version='${pkgver}.${_PROTON_NAME_ADDON}'" >> "$_proton_tkg_path"/proton_tkg_token
       fi
     else
       if [ "$_ispkgbuild" = "true" ]; then
         echo "_protontkg_version=makepkg" >> "$_proton_tkg_path"/proton_tkg_token
-        echo "_protontkg_true_version=${pkgver}" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_true_version='${pkgver}'" >> "$_proton_tkg_path"/proton_tkg_token
       else
-        echo "_protontkg_version=${pkgver}" >> "$_proton_tkg_path"/proton_tkg_token
+        echo "_protontkg_version='${pkgver}'" >> "$_proton_tkg_path"/proton_tkg_token
       fi
     fi
     if [[ $pkgver = 3.* ]]; then
@@ -58,6 +58,7 @@ _exit_cleanup() {
       echo "_dxvk_minimald3d10='true'" >> "$_proton_tkg_path"/proton_tkg_token
     fi
     echo "_new_lib_paths='${_new_lib_paths}'" >> "$_proton_tkg_path"/proton_tkg_token
+    echo "_new_lib_paths_69='${_new_lib_paths_69}'" >> "$_proton_tkg_path"/proton_tkg_token
     echo "_build_mediaconv='${_build_mediaconv}'" >> "$_proton_tkg_path"/proton_tkg_token
   fi
 
@@ -1015,7 +1016,7 @@ _prepare() {
 	  else
 	    _staging_args=$( printf "%s" "${_staging_args[*]}" )
 	  fi
-	  msg2 "Applying wine-staging patches..." && echo -e "\nStaging overrides, if any: ${_staging_args}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
+	  msg2 "Applying wine-staging patches... \n     Staging overrides used, if any: ${_staging_args}" && echo -e "\nStaging overrides, if any: ${_staging_args}\n" >> "$_where"/last_build_config.log && echo -e "\nApplying wine-staging patches..." >> "$_where"/prepare.log
 	  "${srcdir}"/"${_stgsrcdir}"/patches/patchinstall.sh DESTDIR="${srcdir}/${_winesrcdir}" --all $_staging_args >> "$_where"/prepare.log 2>&1 || (error "Patch application has failed. The error was logged to $_where/prepare.log for your convenience."; msg2 "To use the last known good mainline version, please set _plain_version=\"$_last_known_good_mainline\" in your .cfg"; msg2 "To use the last known good staging version, please set _staging_version=\"$_last_known_good_staging\" in your .cfg (requires _use_staging=\"true\")" && exit 1)
 
 	  # Remove staging version tag
@@ -1564,10 +1565,12 @@ EOM
 	    _patchname='FS_bypass_compositor.patch' && _patchmsg="Applied Fullscreen compositor bypass patch" && nonuser_patcher
 	  fi
 	  if [ "$_use_staging" = "true" ]; then
-	    if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor a71e4cdf85fae1282d7cab042fabd66e407d11d6 HEAD ); then
+	    if git merge-base --is-ancestor 9561af9a7d8d77e2f98341e278c842226cae47ed HEAD; then
 	      _patchname='valve_proton_fullscreen_hack-staging.patch' && _patchmsg="Applied Proton fullscreen hack patch (staging)" && nonuser_patcher
 	    else
-	      if git merge-base --is-ancestor 454712a94d62849324d20014c786b0e7c452bf61 HEAD; then
+	      if ( cd "${srcdir}"/"${_stgsrcdir}" && git merge-base --is-ancestor a71e4cdf85fae1282d7cab042fabd66e407d11d6 HEAD ); then
+	        _lastcommit="9561af9"
+	      elif git merge-base --is-ancestor 454712a94d62849324d20014c786b0e7c452bf61 HEAD; then
 	        _lastcommit="a71e4cd"
 	      elif git merge-base --is-ancestor a92ab08688b1e425c887ccb77196bbf681f24be1 HEAD; then
 	        _lastcommit="454712a"
@@ -2395,14 +2398,16 @@ EOM
 	  fi
 
 	  if [ "$_update_winevulkan" = "true" ] && git merge-base --is-ancestor 7e736b5903d3d078bbf7bb6a509536a942f6b9a0 HEAD && ( ! git merge-base --is-ancestor 0f972e2247932f255f131792724e4796b4b2b87a HEAD || git merge-base --is-ancestor 21e002aa7e7f85d92d1efeaeb7a9545eb16b96ad HEAD && [ "$_proton_fs_hack" = "true" ] ); then
-	    if git merge-base --is-ancestor 88da78ef428317ff8c258277511abebf1a75e186 HEAD; then
+	    if git merge-base --is-ancestor 9561af9a7d8d77e2f98341e278c842226cae47ed HEAD; then
 	      if [ "$_proton_fs_hack" = "true" ]; then
 	        _patchname='proton-winevulkan.patch' && _patchmsg="Using Proton winevulkan patches" && nonuser_patcher
 	      else
 	        _patchname='proton-winevulkan-nofshack.patch' && _patchmsg="Using Proton winevulkan patches (nofshack)" && nonuser_patcher
 	      fi
 	    else
-	      if git merge-base --is-ancestor c681a0732fc3c6466b228417bb5e0d518d26b819 HEAD; then
+	      if git merge-base --is-ancestor 88da78ef428317ff8c258277511abebf1a75e186 HEAD; then
+	        _lastcommit="9561af9"
+	      elif git merge-base --is-ancestor c681a0732fc3c6466b228417bb5e0d518d26b819 HEAD; then
 	        _lastcommit="88da78e"
 	      elif git merge-base --is-ancestor eb9f3dd3ad07aae3c9588bcff376ed2a7a8ef8d2 HEAD; then
 	        _lastcommit="c681a07"
