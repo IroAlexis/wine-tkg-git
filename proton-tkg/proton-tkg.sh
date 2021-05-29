@@ -192,7 +192,7 @@ function build_lsteamclient {
     cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.fake proton_dist_tmp/lib64/wine/x86_64-windows/lsteamclient.dll
     cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.fake proton_dist_tmp/lib/wine/i386-windows/lsteamclient.dll
     # workarounds
-    cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/x86_64-unix/steamclient64.dll.so
+    #cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.so proton_dist_tmp/lib64/wine/x86_64-unix/steamclient64.dll.so # Skyrim SE doesn't like this
     cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.so proton_dist_tmp/lib/wine/i386-unix/steamclient.dll.so
     cp -v Proton/build/lsteamclient.win64/lsteamclient.dll.fake proton_dist_tmp/lib64/wine/x86_64-windows/steamclient64.dll
     cp -v Proton/build/lsteamclient.win32/lsteamclient.dll.fake proton_dist_tmp/lib/wine/i386-windows/steamclient.dll
@@ -919,6 +919,15 @@ else
 
     cd "$_nowhere"
 
+    # default prefix
+    echo ''
+    echo "Generating default prefix..."
+    if [ "$_ispkgbuild" != "true" ]; then
+      python3 "$_nowhere"/proton_template/default_pfx.py "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" "$_nowhere/proton_tkg_$_protontkg_version/files" >>"$_logdir"/proton-tkg.log 2>&1
+    else
+      python3 "$_nowhere"/proton_template/default_pfx-makepkg.py "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" "$_nowhere/proton_tkg_$_protontkg_version/files" >>"$_logdir"/proton-tkg.log 2>&1
+    fi
+
     if [ "$_ispkgbuild" != "true" ]; then
       if [ "$_no_steampath" != "y" ]; then
         if [ "$_no_autoinstall" != "true" ] ; then
@@ -957,15 +966,6 @@ else
         echo "####################################################################################################"
       fi
     else
-      # Generate default prefix
-      echo ''
-      echo "Generating default prefix..."
-      mkdir "$_nowhere"/"proton_tkg_$_protontkg_version"/files/share/default_pfx
-      if [ "$_new_lib_paths" = "true" ]; then
-        WINEDLLPATH="$_nowhere/proton_tkg_$_protontkg_version/files/lib:$_nowhere/proton_tkg_$_protontkg_version/files/lib64:$_nowhere/proton_tkg_$_protontkg_version/files/lib64/wine/x86_64-windows:$_nowhere/proton_tkg_$_protontkg_version/files/lib/wine/i386-windows" LD_LIBRARY_PATH="$_nowhere/proton_tkg_$_protontkg_version/files/lib64/wine/x86_64-unix:$_nowhere/proton_tkg_$_protontkg_version/files/lib64/wine/x86_64/unix::/usr/lib/steam:/usr/lib32/steam" PATH="$_nowhere/proton_tkg_$_protontkg_version/files/bin/:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" WINEPREFIX="$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" wineboot -u >>"$_logdir"/proton-tkg.log 2>&1
-      else
-        WINEDLLPATH="$_nowhere/proton_tkg_$_protontkg_version/files/lib64/wine:$_nowhere/proton_tkg_$_protontkg_version/files/lib/wine" LD_LIBRARY_PATH="$_nowhere/proton_tkg_$_protontkg_version/files/lib64/:$_nowhere/proton_tkg_$_protontkg_version/files/lib/::/usr/lib/steam:/usr/lib32/steam" PATH="$_nowhere/proton_tkg_$_protontkg_version/files/bin/:/usr/local/sbin:/usr/local/bin:/usr/bin:/usr/lib/jvm/default/bin:/usr/bin/site_perl:/usr/bin/vendor_perl:/usr/bin/core_perl" WINEPREFIX="$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" wineboot -u >>"$_logdir"/proton-tkg.log 2>&1
-      fi
       wine_is_running
       for _d in "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx/dosdevices"; do
         if [ "$_d" != "c:" ]; then
