@@ -259,6 +259,10 @@ function build_dxvk {
 
 function build_mediaconverter {
 
+if [ "$_build_gstreamer" = "true" ]; then
+  source "$_nowhere"/proton_template/gstreamer && _gstreamer
+fi
+
 mkdir -p "$_nowhere/gst/lib64/gstreamer-1.0"
 
   if [ -d "$_nowhere"/Proton/media-converter ]; then
@@ -268,12 +272,14 @@ mkdir -p "$_nowhere/gst/lib64/gstreamer-1.0"
     #rm -rf "$_nowhere"/Proton/build/mediaconv32/*
     rm -rf "$_nowhere"/Proton/build/mediaconv64/*
 
+    # 32-bit
     #( PKG_CONFIG_ALLOW_CROSS=1 PKG_CONFIG_PATH=/usr/lib32/pkgconfig cargo build --target i686-unknown-linux-gnu --target-dir "$_nowhere"/Proton/build/mediaconv32 --release )
 
+    # 64-bit
     ( if [ ! -d '/usr/lib32' ]; then # Fedora
-      PKG_CONFIG_PATH='/usr/lib64/pkgconfig'
+      PKG_CONFIG_PATH="$_proton_tkg_path/gst/lib64/pkgconfig:/usr/lib64/pkgconfig"
     elif [ -d '/usr/lib32' ] && [ -d '/usr/lib' ] && [ -e '/usr/lib64' ]; then # Arch
-      PKG_CONFIG_PATH='/usr/lib/pkgconfig'
+      PKG_CONFIG_PATH="$_proton_tkg_path/gst/lib64/pkgconfig:/usr/lib/pkgconfig"
     fi
     cargo build --target x86_64-unknown-linux-gnu --target-dir "$_nowhere"/Proton/build/mediaconv64 --release )
 
@@ -641,13 +647,8 @@ else
     echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "$_nowhere/proton_dist_tmp/version" && cp -r "$_nowhere/proton_template/share"/* "$_nowhere/proton_dist_tmp/share"/
 
     # Create the dxvk dirs
-    if [ "$_new_lib_paths" = "true" ]; then
-      mkdir -p "$_nowhere"/proton_dist_tmp/dxvk/x64
-      mkdir -p "$_nowhere"/proton_dist_tmp/dxvk/x32
-    else
-      mkdir -p "$_nowhere/proton_dist_tmp/lib64/wine/dxvk"
-      mkdir -p "$_nowhere/proton_dist_tmp/lib/wine/dxvk"
-    fi
+    mkdir -p "$_nowhere/proton_dist_tmp/lib64/wine/dxvk"
+    mkdir -p "$_nowhere/proton_dist_tmp/lib/wine/dxvk"
 
     # Build vrclient libs
     if [ "$_steamvr_support" = "true" ]; then
@@ -671,27 +672,15 @@ else
     # Build vkd3d-proton when vkd3dlib is disabled - Requires MinGW-w64-gcc or it won't be built
     if [ "$_build_vkd3d" = "true" ]; then
       build_vkd3d
-      if [ "$_new_lib_paths" = "true" ]; then
-        mkdir -p proton_dist_tmp/vkd3d-proton/x32
-        mkdir -p proton_dist_tmp/vkd3d-proton/x64
-        cp -v "$_nowhere"/vkd3d-proton/build/lib64-vkd3d/bin/* proton_dist_tmp/vkd3d-proton/x64
-        cp -v "$_nowhere"/vkd3d-proton/build/lib32-vkd3d/bin/* proton_dist_tmp/vkd3d-proton/x32
-      else
-        mkdir -p proton_dist_tmp/lib64/wine/vkd3d-proton
-        mkdir -p proton_dist_tmp/lib/wine/vkd3d-proton
-        cp -v "$_nowhere"/vkd3d-proton/build/lib64-vkd3d/bin/* proton_dist_tmp/lib64/wine/vkd3d-proton/
-        cp -v "$_nowhere"/vkd3d-proton/build/lib32-vkd3d/bin/* proton_dist_tmp/lib/wine/vkd3d-proton/
-      fi
+      mkdir -p proton_dist_tmp/lib64/wine/vkd3d-proton
+      mkdir -p proton_dist_tmp/lib/wine/vkd3d-proton
+      cp -v "$_nowhere"/vkd3d-proton/build/lib64-vkd3d/bin/* proton_dist_tmp/lib64/wine/vkd3d-proton/
+      cp -v "$_nowhere"/vkd3d-proton/build/lib32-vkd3d/bin/* proton_dist_tmp/lib/wine/vkd3d-proton/
     fi
 
     # dxvk
-    if [ "$_new_lib_paths" = "true" ]; then
-      _proton_dxvk_path32="proton_dist_tmp/dxvk/x32/"
-      _proton_dxvk_path64="proton_dist_tmp/dxvk/x64/"
-    else
-      _proton_dxvk_path32="proton_dist_tmp/lib/wine/dxvk/"
-      _proton_dxvk_path64="proton_dist_tmp/lib64/wine/dxvk/"
-    fi
+    _proton_dxvk_path32="proton_dist_tmp/lib/wine/dxvk/"
+    _proton_dxvk_path64="proton_dist_tmp/lib64/wine/dxvk/"
     cd "$_nowhere"
     if [ "$_use_dxvk" != "false" ]; then
       if [ "$_use_dxvk" = "git" ]; then
@@ -716,6 +705,7 @@ else
           mv "$_nowhere"/dxvk-*.* "$_nowhere"/dxvk
         fi
       fi
+      chmod -R 755 "$_nowhere"/dxvk
       # Remove d3d10.dll and d3d10_1.dll when using a 5.3 base or newer - https://github.com/doitsujin/dxvk/releases/tag/v1.6
       if [ "$_dxvk_minimald3d10" = "true" ]; then
         cp -v dxvk/x64/{d3d10core.dll,d3d11.dll,d3d9.dll,dxgi.dll} $_proton_dxvk_path64
@@ -767,9 +757,7 @@ else
     tar -xvf "$_nowhere"/gecko/wine-gecko-$_gecko_ver-x86$_gecko_compression -C proton_dist_tmp/share/wine/gecko >/dev/null 2>&1
 
     # Move prepared dist
-    mv "$_nowhere"/proton_dist_tmp "$_nowhere"/"proton_tkg_$_protontkg_version"/files
-    #rm -rf proton_dist_tmp
-    cd "$_nowhere"
+    mv "$_nowhere"/proton_dist_tmp "$_nowhere"/"proton_tkg_$_protontkg_version"/files && cd "$_nowhere"
 
     # Grab conf template and inject version
     echo "$_versionpre" "proton-tkg-$_protontkg_true_version" > "proton_tkg_$_protontkg_version/version" && cp "proton_template/conf"/* "proton_tkg_$_protontkg_version"/ && sed -i -e "s|TKGVERSION|$_protontkg_version|" "proton_tkg_$_protontkg_version/compatibilitytool.vdf"
@@ -914,19 +902,23 @@ else
       find "$_nowhere"/"proton_tkg_$_protontkg_version"/ -type f -name "*.dll" -printf "%p\0" | xargs --verbose -0 -r -P8 -n3 "$_nowhere/proton_template/pefixup.py" >>"$_logdir"/proton-tkg.log 2>&1
     fi
 
-    # steampipe fixups
-    #python3 "$_nowhere"/proton_template/steampipe_fixups.py process "$_nowhere"/"proton_tkg_$_protontkg_version"
+    # perms
+    find "$_nowhere/proton_tkg_$_protontkg_version"/files/lib/wine -type f -execdir chmod a-w '{}' '+'
+    find "$_nowhere/proton_tkg_$_protontkg_version"/files/lib64/wine -type f -execdir chmod a-w '{}' '+'
 
     cd "$_nowhere"
 
     # default prefix
     echo ''
     echo "Generating default prefix..."
-    if [ "$_ispkgbuild" != "true" ]; then
-      python3 "$_nowhere"/proton_template/default_pfx.py "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" "$_nowhere/proton_tkg_$_protontkg_version/files" >>"$_logdir"/proton-tkg.log 2>&1
-    else
-      python3 "$_nowhere"/proton_template/default_pfx-makepkg.py "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" "$_nowhere/proton_tkg_$_protontkg_version/files" >>"$_logdir"/proton-tkg.log 2>&1
-    fi
+    python3 "$_nowhere"/proton_template/default_pfx.py "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx" "$_nowhere/proton_tkg_$_protontkg_version/files" >>"$_logdir"/proton-tkg.log 2>&1
+
+    wine_is_running
+
+    # steampipe fixups
+    echo ''
+    echo "Running steampipe fixups..."
+    python3 "$_nowhere"/proton_template/steampipe_fixups.py process "$_nowhere"/"proton_tkg_$_protontkg_version"
 
     if [ "$_ispkgbuild" != "true" ]; then
       if [ "$_no_steampath" != "y" ]; then
@@ -966,12 +958,11 @@ else
         echo "####################################################################################################"
       fi
     else
-      wine_is_running
-      for _d in "$_nowhere/proton_tkg_$_protontkg_version/files/share/default_pfx/dosdevices"; do
-        if [ "$_d" != "c:" ]; then
-          rm -rf "$_d"
-        fi
-      done
+      # Apparently this can happen.. So let's clean it up if needed.
+      if [[ -f /usr/share/steam/compatibilitytools.d/proton_tkg_makepkg/dist* ]] || [[ -d /usr/share/steam/compatibilitytools.d/proton_tkg_makepkg/dist* ]]; then
+        echo -e "\nAn undesirable remnant of a previous build using /dist was found. We need to remove it from /usr/share/steam/compatibilitytools.d with sudo."
+        sudo sh -c 'rm -rf /usr/share/steam/compatibilitytools.d/proton_tkg_makepkg/dist*'
+      fi
     fi
   else
     rm "$_nowhere"/proton_tkg_token
